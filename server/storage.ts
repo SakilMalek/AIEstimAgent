@@ -1,3 +1,11 @@
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import { 
+  projects, 
+  drawings, 
+  takeoffs, 
+  materialCosts 
+} from "@shared/schema";
 import { type Project, type InsertProject, type Drawing, type InsertDrawing, type Takeoff, type InsertTakeoff, type MaterialCost, type InsertMaterialCost } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -27,39 +35,39 @@ export interface IStorage {
   createMaterialCost(cost: InsertMaterialCost): Promise<MaterialCost>;
 }
 
-export class MemStorage implements IStorage {
-  private projects: Map<string, Project>;
-  private drawings: Map<string, Drawing>;
-  private takeoffs: Map<string, Takeoff>;
-  private materialCosts: Map<string, MaterialCost>;
+export class DatabaseStorage implements IStorage {
+  private initialized = false;
 
   constructor() {
-    this.projects = new Map();
-    this.drawings = new Map();
-    this.takeoffs = new Map();
-    this.materialCosts = new Map();
-    
-    // Initialize with sample data
-    this.initializeSampleData();
+    // Initialize with sample data asynchronously
+    this.initializeSampleData().catch(console.error);
   }
 
-  private initializeSampleData() {
+  private async initializeSampleData() {
+    try {
+      // Check if sample data already exists
+      const existingProjects = await db.select().from(projects).limit(1);
+      if (existingProjects.length > 0) {
+        this.initialized = true;
+        return;
+      }
+
     // Sample project
-    const sampleProject: Project = {
-      id: "proj-1",
-      name: "Downtown Office Complex",
-      address: "123 Business Ave, Suite 400",
-      status: "active",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.projects.set(sampleProject.id, sampleProject);
+    const [sampleProject] = await db
+      .insert(projects)
+      .values({
+        id: "proj-1",
+        name: "Downtown Office Complex",
+        address: "123 Business Ave, Suite 400",
+        status: "active",
+      })
+      .returning();
 
     // Sample drawings
-    const sampleDrawings: Drawing[] = [
+    const sampleDrawings = [
       {
         id: "draw-1",
-        projectId: "proj-1",
+        projectId: sampleProject.id,
         name: "Floor Plan - Level 1",
         filename: "floor-plan-l1.pdf",
         fileUrl: "/uploads/floor-plan-l1.pdf",
@@ -67,12 +75,10 @@ export class MemStorage implements IStorage {
         status: "complete",
         scale: "1/4\" = 1'",
         aiProcessed: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
         id: "draw-2",
-        projectId: "proj-1",
+        projectId: sampleProject.id,
         name: "Electrical Plan - Level 1",
         filename: "electrical-l1.pdf",
         fileUrl: "/uploads/electrical-l1.pdf",
@@ -80,12 +86,10 @@ export class MemStorage implements IStorage {
         status: "complete",
         scale: "1/4\" = 1'",
         aiProcessed: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
       {
         id: "draw-3",
-        projectId: "proj-1",
+        projectId: sampleProject.id,
         name: "HVAC Layout - Level 1",
         filename: "hvac-l1.pdf",
         fileUrl: "/uploads/hvac-l1.pdf",
@@ -93,15 +97,68 @@ export class MemStorage implements IStorage {
         status: "processing",
         scale: "1/4\" = 1'",
         aiProcessed: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       },
     ];
     
-    sampleDrawings.forEach(drawing => this.drawings.set(drawing.id, drawing));
+    await db.insert(drawings).values(sampleDrawings);
+
+    // Sample takeoffs for the first drawing
+    await db.insert(takeoffs).values([
+      {
+        id: "takeoff-1",
+        drawingId: "draw-1",
+        elementType: "doors",
+        elementName: "Interior Door - 36\" x 80\"",
+        quantity: 12,
+        width: 36,
+        height: 80,
+        unit: "each",
+        coordinates: { x: 100, y: 200 },
+        detectedByAi: true,
+        costPerUnit: 250,
+        totalCost: 3000,
+      },
+      {
+        id: "takeoff-2",
+        drawingId: "draw-1",
+        elementType: "windows",
+        elementName: "Double Hung Window - 48\" x 60\"",
+        quantity: 8,
+        width: 48,
+        height: 60,
+        unit: "each",
+        coordinates: { x: 300, y: 150 },
+        detectedByAi: true,
+        costPerUnit: 450,
+        totalCost: 3600,
+      },
+      {
+        id: "takeoff-3",
+        drawingId: "draw-1",
+        elementType: "flooring",
+        elementName: "Luxury Vinyl Plank",
+        quantity: 2400,
+        area: 2400,
+        unit: "sq ft",
+        detectedByAi: true,
+        costPerUnit: 4.5,
+        totalCost: 10800,
+      },
+      {
+        id: "takeoff-4",
+        drawingId: "draw-1",
+        elementType: "electrical",
+        elementName: "Electrical Outlets",
+        quantity: 24,
+        unit: "each",
+        detectedByAi: true,
+        costPerUnit: 85,
+        totalCost: 2040,
+      }
+    ]);
 
     // Sample material costs
-    const sampleCosts: MaterialCost[] = [
+    await db.insert(materialCosts).values([
       {
         id: "cost-1",
         category: "doors",
@@ -110,7 +167,6 @@ export class MemStorage implements IStorage {
         materialCost: 180,
         laborCost: 150,
         description: "Standard hollow core interior door with frame",
-        updatedAt: new Date(),
       },
       {
         id: "cost-2",
@@ -120,7 +176,6 @@ export class MemStorage implements IStorage {
         materialCost: 350,
         laborCost: 200,
         description: "Standard double hung window with installation",
-        updatedAt: new Date(),
       },
       {
         id: "cost-3",
@@ -130,160 +185,119 @@ export class MemStorage implements IStorage {
         materialCost: 8.5,
         laborCost: 6.0,
         description: "Oak hardwood flooring with installation",
-        updatedAt: new Date(),
       },
-    ];
+    ]);
     
-    sampleCosts.forEach(cost => this.materialCosts.set(cost.id, cost));
+    this.initialized = true;
+    console.log("Sample data initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize sample data:", error);
+    // Continue without sample data
   }
+}
 
   // Projects
   async getProject(id: string): Promise<Project | undefined> {
-    return this.projects.get(id);
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
   }
 
   async getProjects(): Promise<Project[]> {
-    return Array.from(this.projects.values());
+    return await db.select().from(projects);
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const id = randomUUID();
-    const now = new Date();
-    const project: Project = { 
-      ...insertProject,
-      address: insertProject.address || null,
-      id, 
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.projects.set(id, project);
+    const [project] = await db
+      .insert(projects)
+      .values({ ...insertProject, id: randomUUID() })
+      .returning();
     return project;
   }
 
   async updateProject(id: string, updateData: Partial<InsertProject>): Promise<Project | undefined> {
-    const project = this.projects.get(id);
-    if (!project) return undefined;
-    
-    const updatedProject = { 
-      ...project, 
-      ...updateData, 
-      updatedAt: new Date() 
-    };
-    this.projects.set(id, updatedProject);
-    return updatedProject;
+    const [project] = await db
+      .update(projects)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(projects.id, id))
+      .returning();
+    return project;
   }
 
   // Drawings
   async getDrawing(id: string): Promise<Drawing | undefined> {
-    return this.drawings.get(id);
+    const [drawing] = await db.select().from(drawings).where(eq(drawings.id, id));
+    return drawing;
   }
 
   async getDrawingsByProject(projectId: string): Promise<Drawing[]> {
-    return Array.from(this.drawings.values()).filter(
-      drawing => drawing.projectId === projectId
-    );
+    return await db.select().from(drawings).where(eq(drawings.projectId, projectId));
   }
 
   async createDrawing(insertDrawing: InsertDrawing): Promise<Drawing> {
-    const id = randomUUID();
-    const now = new Date();
-    const drawing: Drawing = { 
-      ...insertDrawing,
-      scale: insertDrawing.scale || null,
-      aiProcessed: insertDrawing.aiProcessed || false,
-      id, 
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.drawings.set(id, drawing);
+    const [drawing] = await db
+      .insert(drawings)
+      .values({ ...insertDrawing, id: randomUUID() })
+      .returning();
     return drawing;
   }
 
   async updateDrawing(id: string, updateData: Partial<InsertDrawing>): Promise<Drawing | undefined> {
-    const drawing = this.drawings.get(id);
-    if (!drawing) return undefined;
-    
-    const updatedDrawing = { 
-      ...drawing, 
-      ...updateData, 
-      updatedAt: new Date() 
-    };
-    this.drawings.set(id, updatedDrawing);
-    return updatedDrawing;
+    const [drawing] = await db
+      .update(drawings)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(drawings.id, id))
+      .returning();
+    return drawing;
   }
 
   // Takeoffs
   async getTakeoff(id: string): Promise<Takeoff | undefined> {
-    return this.takeoffs.get(id);
+    const [takeoff] = await db.select().from(takeoffs).where(eq(takeoffs.id, id));
+    return takeoff;
   }
 
   async getTakeoffsByDrawing(drawingId: string): Promise<Takeoff[]> {
-    return Array.from(this.takeoffs.values()).filter(
-      takeoff => takeoff.drawingId === drawingId
-    );
+    return await db.select().from(takeoffs).where(eq(takeoffs.drawingId, drawingId));
   }
 
   async createTakeoff(insertTakeoff: InsertTakeoff): Promise<Takeoff> {
-    const id = randomUUID();
-    const now = new Date();
-    const takeoff: Takeoff = { 
-      ...insertTakeoff,
-      area: insertTakeoff.area || null,
-      length: insertTakeoff.length || null,
-      width: insertTakeoff.width || null,
-      height: insertTakeoff.height || null,
-      coordinates: insertTakeoff.coordinates || null,
-      detectedByAi: insertTakeoff.detectedByAi || false,
-      costPerUnit: insertTakeoff.costPerUnit || null,
-      totalCost: insertTakeoff.totalCost || null,
-      quantity: insertTakeoff.quantity || null,
-      id, 
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.takeoffs.set(id, takeoff);
+    const [takeoff] = await db
+      .insert(takeoffs)
+      .values({ ...insertTakeoff, id: randomUUID() })
+      .returning();
     return takeoff;
   }
 
   async updateTakeoff(id: string, updateData: Partial<InsertTakeoff>): Promise<Takeoff | undefined> {
-    const takeoff = this.takeoffs.get(id);
-    if (!takeoff) return undefined;
-    
-    const updatedTakeoff = { 
-      ...takeoff, 
-      ...updateData, 
-      updatedAt: new Date() 
-    };
-    this.takeoffs.set(id, updatedTakeoff);
-    return updatedTakeoff;
+    const [takeoff] = await db
+      .update(takeoffs)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(takeoffs.id, id))
+      .returning();
+    return takeoff;
   }
 
   async deleteTakeoff(id: string): Promise<boolean> {
-    return this.takeoffs.delete(id);
+    const result = await db.delete(takeoffs).where(eq(takeoffs.id, id));
+    return result.rowCount > 0;
   }
 
   // Material Costs
   async getMaterialCosts(): Promise<MaterialCost[]> {
-    return Array.from(this.materialCosts.values());
+    return await db.select().from(materialCosts);
   }
 
   async getMaterialCostsByCategory(category: string): Promise<MaterialCost[]> {
-    return Array.from(this.materialCosts.values()).filter(
-      cost => cost.category === category
-    );
+    return await db.select().from(materialCosts).where(eq(materialCosts.category, category));
   }
 
   async createMaterialCost(insertCost: InsertMaterialCost): Promise<MaterialCost> {
-    const id = randomUUID();
-    const cost: MaterialCost = { 
-      ...insertCost,
-      description: insertCost.description || null,
-      id, 
-      updatedAt: new Date(),
-    };
-    this.materialCosts.set(id, cost);
+    const [cost] = await db
+      .insert(materialCosts)
+      .values({ ...insertCost, id: randomUUID() })
+      .returning();
     return cost;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

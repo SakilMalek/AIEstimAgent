@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -55,6 +56,26 @@ export const materialCosts = pgTable("material_costs", {
   description: text("description"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Define relations
+export const projectsRelations = relations(projects, ({ many }) => ({
+  drawings: many(drawings),
+}));
+
+export const drawingsRelations = relations(drawings, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [drawings.projectId],
+    references: [projects.id],
+  }),
+  takeoffs: many(takeoffs),
+}));
+
+export const takeoffsRelations = relations(takeoffs, ({ one }) => ({
+  drawing: one(drawings, {
+    fields: [takeoffs.drawingId],
+    references: [drawings.id],
+  }),
+}));
 
 // Insert schemas
 export const insertProjectSchema = createInsertSchema(projects).omit({

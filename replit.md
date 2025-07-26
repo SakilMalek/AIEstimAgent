@@ -21,12 +21,14 @@ Preferred communication style: Simple, everyday language.
 - **Node.js/Express**: RESTful API server with TypeScript
 - **Development Server**: Vite middleware integration for development
 - **File Upload**: Multer for handling PDF and image uploads (up to 50MB)
-- **Storage**: In-memory storage with interface for future database integration
+- **Storage**: PostgreSQL database with Drizzle ORM for persistent data storage
 
 ### Database Design
-- **ORM**: Drizzle ORM configured for PostgreSQL
+- **Database**: PostgreSQL with Neon Database serverless hosting
+- **ORM**: Drizzle ORM configured for PostgreSQL with proper relations
 - **Schema**: Well-defined tables for projects, drawings, takeoffs, and material costs
-- **Migrations**: Managed through Drizzle Kit
+- **Relations**: Explicit foreign key relationships between tables
+- **Migrations**: Managed through Drizzle Kit (`npm run db:push`)
 
 ## Key Components
 
@@ -94,10 +96,15 @@ Preferred communication style: Simple, everyday language.
 - Database migrations handled through Drizzle Kit
 - File storage currently local (scalability consideration)
 
+### Recent Changes (January 2025)
+- **Database Integration**: Successfully migrated from in-memory storage to PostgreSQL with Drizzle ORM
+- **Navigation System**: Implemented functional navigation between Dashboard, Projects, and Reports pages
+- **Persistent Storage**: All project data, drawings, takeoffs, and material costs now persist in the database
+- **Sample Data**: Automatic initialization of sample construction data on first run
+
 ### Current Limitations
-- In-memory storage implementation (development placeholder)
 - Local file storage (not suitable for distributed deployment)
 - AI processing logic not implemented (placeholder functions)
 - No authentication/authorization system
 
-The architecture is designed for rapid development with clear separation of concerns and easy migration to production-ready solutions (database persistence, cloud storage, actual AI integration).
+The architecture now provides persistent data storage with PostgreSQL while maintaining clear separation of concerns and preparation for production deployment (cloud storage, actual AI integration).
