@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+
+  /* Blueprint color scheme */
+  --blueprint-50: hsl(214, 100%, 97%);
+  --blueprint-100: hsl(214, 95%, 93%);
+  --blueprint-200: hsl(213, 97%, 87%);
+  --blueprint-300: hsl(212, 96%, 78%);
+  --blueprint-400: hsl(213, 94%, 68%);
+  --blueprint-500: hsl(217, 91%, 60%);
+  --blueprint-600: hsl(221, 83%, 53%);
+  --blueprint-700: hsl(224, 76%, 48%);
+  --blueprint-800: hsl(226, 71%, 40%);
+  --blueprint-900: hsl(224, 64%, 33%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .blueprint-50 {
+    background-color: var(--blueprint-50);
+  }
+  .blueprint-100 {
+    background-color: var(--blueprint-100);
+  }
+  .blueprint-200 {
+    background-color: var(--blueprint-200);
+  }
+  .blueprint-300 {
+    background-color: var(--blueprint-300);
+  }
+  .blueprint-400 {
+    background-color: var(--blueprint-400);
+  }
+  .blueprint-500 {
+    background-color: var(--blueprint-500);
+  }
+  .blueprint-600 {
+    background-color: var(--blueprint-600);
+  }
+  .blueprint-700 {
+    background-color: var(--blueprint-700);
+  }
+  .blueprint-800 {
+    background-color: var(--blueprint-800);
+  }
+  .blueprint-900 {
+    background-color: var(--blueprint-900);
+  }
+
+  .text-blueprint-50 {
+    color: var(--blueprint-50);
+  }
+  .text-blueprint-100 {
+    color: var(--blueprint-100);
+  }
+  .text-blueprint-200 {
+    color: var(--blueprint-200);
+  }
+  .text-blueprint-300 {
+    color: var(--blueprint-300);
+  }
+  .text-blueprint-400 {
+    color: var(--blueprint-400);
+  }
+  .text-blueprint-500 {
+    color: var(--blueprint-500);
+  }
+  .text-blueprint-600 {
+    color: var(--blueprint-600);
+  }
+  .text-blueprint-700 {
+    color: var(--blueprint-700);
+  }
+  .text-blueprint-800 {
+    color: var(--blueprint-800);
+  }
+  .text-blueprint-900 {
+    color: var(--blueprint-900);
+  }
+
+  .border-blueprint-50 {
+    border-color: var(--blueprint-50);
+  }
+  .border-blueprint-100 {
+    border-color: var(--blueprint-100);
+  }
+  .border-blueprint-200 {
+    border-color: var(--blueprint-200);
+  }
+  .border-blueprint-300 {
+    border-color: var(--blueprint-300);
+  }
+  .border-blueprint-400 {
+    border-color: var(--blueprint-400);
+  }
+  .border-blueprint-500 {
+    border-color: var(--blueprint-500);
+  }
+  .border-blueprint-600 {
+    border-color: var(--blueprint-600);
+  }
+  .border-blueprint-700 {
+    border-color: var(--blueprint-700);
+  }
+  .border-blueprint-800 {
+    border-color: var(--blueprint-800);
+  }
+  .border-blueprint-900 {
+    border-color: var(--blueprint-900);
+  }
+}
