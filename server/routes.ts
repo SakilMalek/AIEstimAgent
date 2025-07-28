@@ -64,6 +64,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/projects/:id", async (req, res) => {
+    try {
+      const updateData = insertProjectSchema.partial().parse(req.body);
+      const project = await storage.updateProject(req.params.id, updateData);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid project data" });
+    }
+  });
+
   // Drawings routes
   app.get("/api/projects/:projectId/drawings", async (req, res) => {
     try {

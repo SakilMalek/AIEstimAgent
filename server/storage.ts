@@ -58,7 +58,9 @@ export class DatabaseStorage implements IStorage {
       .values({
         id: "proj-1",
         name: "Downtown Office Complex",
-        address: "123 Business Ave, Suite 400",
+        description: "Mixed-use commercial building with office spaces and retail on ground floor",
+        location: "123 Business Ave, Suite 400",
+        client: "Downtown Development LLC",
         status: "active",
       })
       .returning();
@@ -109,6 +111,7 @@ export class DatabaseStorage implements IStorage {
         drawingId: "draw-1",
         elementType: "doors",
         elementName: "Interior Door - 36\" x 80\"",
+        itemType: "Interior Door",
         quantity: 12,
         width: 36,
         height: 80,
@@ -123,6 +126,7 @@ export class DatabaseStorage implements IStorage {
         drawingId: "draw-1",
         elementType: "windows",
         elementName: "Double Hung Window - 48\" x 60\"",
+        itemType: "Double Hung Window",
         quantity: 8,
         width: 48,
         height: 60,
@@ -137,6 +141,7 @@ export class DatabaseStorage implements IStorage {
         drawingId: "draw-1",
         elementType: "flooring",
         elementName: "Luxury Vinyl Plank",
+        itemType: "Vinyl Flooring",
         quantity: 2400,
         area: 2400,
         unit: "sq ft",
@@ -149,6 +154,7 @@ export class DatabaseStorage implements IStorage {
         drawingId: "draw-1",
         elementType: "electrical",
         elementName: "Electrical Outlets",
+        itemType: "Electrical Outlet",
         quantity: 24,
         unit: "each",
         detectedByAi: true,

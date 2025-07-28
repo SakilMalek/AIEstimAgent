@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,10 +27,13 @@ import {
 import type { Project, InsertProject } from "@shared/schema";
 
 export default function Projects() {
+  const [, setLocation] = useLocation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newProject, setNewProject] = useState<InsertProject>({
     name: "",
-    address: "",
+    description: "",
+    location: "",
+    client: "",
     status: "active",
   });
   
@@ -42,10 +46,7 @@ export default function Projects() {
 
   const createProjectMutation = useMutation({
     mutationFn: (projectData: InsertProject) =>
-      apiRequest("/api/projects", {
-        method: "POST",
-        body: JSON.stringify(projectData),
-      }),
+      apiRequest("/api/projects", "POST", projectData),
     onSuccess: () => {
       toast({
         title: "Project created",
@@ -53,7 +54,7 @@ export default function Projects() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setIsCreateDialogOpen(false);
-      setNewProject({ name: "", address: "", status: "active" });
+      setNewProject({ name: "", description: "", location: "", client: "", status: "active" });
     },
     onError: (error: Error) => {
       toast({
@@ -108,12 +109,30 @@ export default function Projects() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="project-address">Address</Label>
+                  <Label htmlFor="project-location">Location</Label>
                   <Input
-                    id="project-address"
-                    value={newProject.address || ""}
-                    onChange={(e) => setNewProject({ ...newProject, address: e.target.value })}
-                    placeholder="Enter project address"
+                    id="project-location"
+                    value={newProject.location || ""}
+                    onChange={(e) => setNewProject({ ...newProject, location: e.target.value })}
+                    placeholder="Enter project location"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="project-client">Client</Label>
+                  <Input
+                    id="project-client"
+                    value={newProject.client || ""}
+                    onChange={(e) => setNewProject({ ...newProject, client: e.target.value })}
+                    placeholder="Enter client name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="project-description">Description</Label>
+                  <Input
+                    id="project-description"
+                    value={newProject.description || ""}
+                    onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                    placeholder="Enter project description"
                   />
                 </div>
                 <div>
@@ -191,16 +210,23 @@ export default function Projects() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {project.address && (
+                  {project.location && (
                     <div className="flex items-center space-x-2 text-sm text-slate-600">
                       <MapPin className="w-4 h-4" />
-                      <span>{project.address}</span>
+                      <span>{project.location}</span>
+                    </div>
+                  )}
+                  
+                  {project.client && (
+                    <div className="flex items-center space-x-2 text-sm text-slate-600">
+                      <Building className="w-4 h-4" />
+                      <span>{project.client}</span>
                     </div>
                   )}
                   
                   <div className="flex items-center space-x-2 text-sm text-slate-600">
                     <Calendar className="w-4 h-4" />
-                    <span>Created {new Date(project.createdAt || "").toLocaleDateString()}</span>
+                    <span>Created {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown'}</span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200">
@@ -229,7 +255,7 @@ export default function Projects() {
 
                   <Button 
                     className="w-full mt-4 bg-blueprint-600 hover:bg-blueprint-700"
-                    onClick={() => window.location.href = `/?project=${project.id}`}
+                    onClick={() => setLocation(`/projects/${project.id}`)}
                   >
                     Open Project
                   </Button>

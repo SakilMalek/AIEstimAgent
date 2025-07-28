@@ -7,7 +7,9 @@ import { z } from "zod";
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  address: text("address"),
+  description: text("description"),
+  location: text("location"),
+  client: text("client"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -23,6 +25,7 @@ export const drawings = pgTable("drawings", {
   status: text("status").notNull().default("pending"), // pending, processing, complete, error
   scale: text("scale").default("1/4\" = 1'"),
   aiProcessed: boolean("ai_processed").default(false),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -32,6 +35,7 @@ export const takeoffs = pgTable("takeoffs", {
   drawingId: varchar("drawing_id").references(() => drawings.id).notNull(),
   elementType: text("element_type").notNull(), // doors, windows, flooring, walls, electrical, plumbing
   elementName: text("element_name").notNull(),
+  itemType: text("item_type").notNull(), // display name for UI
   quantity: integer("quantity").default(0),
   area: real("area"), // for area measurements
   length: real("length"), // for linear measurements
