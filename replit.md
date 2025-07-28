@@ -99,7 +99,9 @@ Preferred communication style: Simple, everyday language.
 ### Recent Changes (January 2025)
 - **Database Integration**: Successfully migrated from in-memory storage to PostgreSQL with Drizzle ORM
 - **Navigation System**: Implemented functional navigation between Dashboard, Projects, and Reports pages
+- **Project Detail Pages**: Added individual project view/edit functionality with comprehensive project management
 - **Persistent Storage**: All project data, drawings, takeoffs, and material costs now persist in the database
+- **Settings Page**: Added comprehensive settings interface for user preferences, notifications, AI configuration, and security
 - **Sample Data**: Automatic initialization of sample construction data on first run
 
 ### Current Limitations
