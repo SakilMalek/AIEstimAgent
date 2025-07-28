@@ -77,6 +77,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/projects/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProject(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
   // Drawings routes
   app.get("/api/projects/:projectId/drawings", async (req, res) => {
     try {

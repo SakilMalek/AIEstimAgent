@@ -15,6 +15,7 @@ export interface IStorage {
   getProjects(): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(id: string): Promise<boolean>;
   
   // Drawings
   getDrawing(id: string): Promise<Drawing | undefined>;
@@ -227,6 +228,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(projects.id, id))
       .returning();
     return project;
+  }
+
+  async deleteProject(id: string): Promise<boolean> {
+    // Delete related takeoffs first
+    const projectDrawings = await db.select().from(drawings).where(eq(drawings.projectId, id));
+    for (const drawing of projectDrawings) {
+      await db.delete(takeoffs).where(eq(takeoffs.drawingId, drawing.id));
+    }
+    
+    // Delete related drawings
+    await db.delete(drawings).where(eq(drawings.projectId, id));
+    
+    // Delete the project
+    const result = await db.delete(projects).where(eq(projects.id, id));
+    return result.rowCount > 0;
   }
 
   // Drawings
