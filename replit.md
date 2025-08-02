@@ -106,6 +106,10 @@ Preferred communication style: Simple, everyday language.
 - **Calculator Tool Removal**: Removed the calculator widget from the navigation header to improve UI spacing
 - **Takeoff Type Selection**: Added comprehensive takeoff type selector allowing users to choose specific building elements (doors, windows, flooring, walls, electrical, plumbing, HVAC, structural) for AI analysis
 - **Selective AI Analysis**: Implemented backend API for running takeoff analysis on specific element types rather than all elements at once
+- **Centered Navigation**: Moved main navigation items (Dashboard - Projects - Reports) to center of header for better visual balance
+- **Prominent AI Takeoff Button**: Added bright purple "Run AI Takeoff" button in dashboard toolbar for clear user workflow
+- **Enhanced Project Management**: Added "Create Project" buttons to both dashboard and projects pages for easier project creation
+- **Improved User Experience**: Clear visual hierarchy with separated project info section and drawing tools section in dashboard
 
 ### Current Limitations
 - Local file storage (not suitable for distributed deployment)
