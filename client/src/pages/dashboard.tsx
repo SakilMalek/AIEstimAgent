@@ -222,6 +222,19 @@ export default function Dashboard() {
                     <option>1/2" = 1'</option>
                   </select>
                 </div>
+                
+                {/* Manual Measurement Tools */}
+                <div className="flex items-center space-x-1 border-l border-slate-300 pl-3">
+                  <Button variant="ghost" size="sm" title="Linear measurement">
+                    <Ruler className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" title="Area measurement">
+                    <Square className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" title="Count items">
+                    <Hash className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
               
               <div className="flex items-center space-x-3">
@@ -260,19 +273,6 @@ export default function Dashboard() {
                   </DialogContent>
                 </Dialog>
 
-                {/* Manual Measurement Tools */}
-                <div className="flex items-center space-x-1 border-l border-slate-300 pl-3">
-                  <Button variant="ghost" size="sm" title="Linear measurement">
-                    <Ruler className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" title="Area measurement">
-                    <Square className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" title="Count items">
-                    <Hash className="w-4 h-4" />
-                  </Button>
-                </div>
-                
                 {/* Export */}
                 <Button className="bg-green-600 hover:bg-green-700" size="sm">
                   <Download className="w-4 h-4 mr-2" />
