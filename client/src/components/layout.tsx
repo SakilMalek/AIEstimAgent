@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings
 } from "lucide-react";
+import BusinessmanIcon from "@/components/businessman-icon";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -25,9 +26,9 @@ export default function Layout({ children }: LayoutProps) {
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center">
             <Link href="/">
-              <div className="flex items-center space-x-2 cursor-pointer">
-                <div className="w-8 h-8 bg-blueprint-600 rounded-lg flex items-center justify-center">
-                  <Home className="text-white w-4 h-4" />
+              <div className="flex items-center space-x-3 cursor-pointer">
+                <div className="w-10 h-10 bg-gradient-to-br from-blueprint-600 to-blueprint-700 rounded-xl flex items-center justify-center shadow-lg">
+                  <BusinessmanIcon className="text-white" size={20} />
                 </div>
                 <span className="text-xl font-bold text-slate-900">EstimAgent</span>
               </div>
