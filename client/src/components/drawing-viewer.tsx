@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import FileUploadDialog from "@/components/file-upload-dialog";
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -12,9 +13,10 @@ import type { Drawing } from "@shared/schema";
 
 interface DrawingViewerProps {
   drawing: Drawing | null;
+  onFileUpload?: (drawing: Drawing) => void;
 }
 
-export default function DrawingViewer({ drawing }: DrawingViewerProps) {
+export default function DrawingViewer({ drawing, onFileUpload }: DrawingViewerProps) {
   const [zoom, setZoom] = useState(100);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -52,17 +54,7 @@ export default function DrawingViewer({ drawing }: DrawingViewerProps) {
   };
 
   if (!drawing) {
-    return (
-      <div className="flex-1 bg-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-slate-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
-            <Maximize className="w-8 h-8 text-slate-400" />
-          </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-2">No Drawing Selected</h3>
-          <p className="text-sm text-slate-600">Select a drawing from the sidebar to view it here</p>
-        </div>
-      </div>
-    );
+    return <FileUploadDialog onFileUpload={onFileUpload || (() => {})} />;
   }
 
   const isProcessing = drawing.status === "processing";

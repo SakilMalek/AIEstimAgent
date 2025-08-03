@@ -9,13 +9,15 @@ import {
   Download,
   Ruler,
   Square,
-  Hash
+  Hash,
+  Upload
 } from "lucide-react";
 import type { Drawing } from "@shared/schema";
 
 export default function Dashboard() {
   const [selectedTakeoffTypes, setSelectedTakeoffTypes] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
 
   const { toast } = useToast();
 
@@ -40,16 +42,8 @@ export default function Dashboard() {
     }, 5000);
   };
 
-  // Use a sample drawing for demonstration
-  const sampleDrawing: Drawing = {
-    id: "sample-1",
-    projectId: "proj-1", 
-    name: "Ground Floor Plan",
-    filename: "ground-floor.pdf",
-    fileSize: 2048000,
-    uploadedAt: new Date().toISOString(),
-    status: "complete",
-    aiProcessed: true
+  const handleFileUpload = (drawing: Drawing) => {
+    setCurrentDrawing(drawing);
   };
 
   return (
@@ -73,7 +67,7 @@ export default function Dashboard() {
                   AI Takeoff Analysis Dashboard
                 </h2>
                 <span className="text-sm text-slate-500">
-                  {sampleDrawing.name}
+                  {currentDrawing?.name || "Upload a drawing to begin"}
                 </span>
               </div>
             </div>
@@ -84,7 +78,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <h3 className="text-sm font-medium text-slate-900">
-                  {sampleDrawing.name}
+                  {currentDrawing?.name || "No drawing selected"}
                 </h3>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs text-slate-500">Scale:</span>
@@ -131,7 +125,7 @@ export default function Dashboard() {
 
           <div className="flex-1 flex overflow-hidden">
             {/* Drawing Viewer */}
-            <DrawingViewer drawing={sampleDrawing} />
+            <DrawingViewer drawing={currentDrawing} onFileUpload={handleFileUpload} />
 
             {/* Enhanced LLM Takeoff Panel */}
             <div className="w-96 bg-white border-l border-slate-200 flex flex-col overflow-hidden">
@@ -140,12 +134,21 @@ export default function Dashboard() {
                 <p className="text-sm text-slate-600">AI-powered takeoff analysis</p>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                <LLMTakeoffProcessor 
-                  drawing={sampleDrawing} 
-                  onAnalysisComplete={() => {
-                    // Refresh takeoff data after analysis
-                  }}
-                />
+                {currentDrawing ? (
+                  <LLMTakeoffProcessor 
+                    drawing={currentDrawing} 
+                    onAnalysisComplete={() => {
+                      // Refresh takeoff data after analysis
+                    }}
+                  />
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                      <p className="text-sm text-slate-600">Upload a drawing to view analysis results</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
