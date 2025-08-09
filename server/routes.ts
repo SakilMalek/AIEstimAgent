@@ -111,6 +111,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/projects/:projectId/drawings", async (req, res) => {
+    try {
+      const drawingData = insertDrawingSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId
+      });
+      const drawing = await storage.createDrawing(drawingData);
+      res.status(201).json(drawing);
+    } catch (error) {
+      console.error("Drawing creation error:", error);
+      res.status(400).json({ message: "Invalid drawing data" });
+    }
+  });
+
   app.post("/api/projects/:projectId/drawings/upload", upload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
