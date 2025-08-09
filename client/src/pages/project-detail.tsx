@@ -1,414 +1,799 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Upload, FileText, Calculator, Edit, Save, X } from "lucide-react";
-import { useState } from "react";
-
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { insertProjectSchema, type Project, type Drawing, type Takeoff } from "@shared/schema";
-import TakeoffTypeSelector from "@/components/takeoff-type-selector";
-
-const editProjectSchema = insertProjectSchema;
+import { apiRequest } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { 
+  ArrowLeft,
+  Building, 
+  Calendar,
+  MapPin,
+  FileImage,
+  Activity,
+  Edit,
+  Trash2,
+  MoreVertical,
+  Save,
+  Download,
+  Plus,
+  Eye,
+  Calculator,
+  FileText,
+  DollarSign,
+  Check,
+  X
+} from "lucide-react";
+import type { Project, SavedAnalysis, Takeoff, Drawing } from "@shared/schema";
 
 export default function ProjectDetail() {
-  const [, params] = useRoute("/projects/:id");
-  const [, setLocation] = useLocation();
-  const [isEditing, setIsEditing] = useState(false);
-  const { toast } = useToast();
-
+  const [match, params] = useRoute("/projects/:id");
   const projectId = params?.id;
+  const [, setLocation] = useLocation();
+  const [isEditingTakeoff, setIsEditingTakeoff] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{ quantity: number; costPerUnit: number; notes: string }>({
+    quantity: 0,
+    costPerUnit: 0,
+    notes: ""
+  });
+  const [isSaveAnalysisOpen, setIsSaveAnalysisOpen] = useState(false);
+  const [analysisName, setAnalysisName] = useState("");
+  const [analysisDescription, setAnalysisDescription] = useState("");
+  const [isDeleteAnalysisOpen, setIsDeleteAnalysisOpen] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<SavedAnalysis | null>(null);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Fetch project details
-  const { data: project, isLoading: projectLoading } = useQuery({
+  // Fetch project data
+  const { data: project, isLoading: projectLoading } = useQuery<Project>({
     queryKey: ["/api/projects", projectId],
-    queryFn: () => fetch(`/api/projects/${projectId}`).then(res => res.json()) as Promise<Project>,
     enabled: !!projectId,
   });
 
   // Fetch project drawings
-  const { data: drawings = [], isLoading: drawingsLoading } = useQuery({
+  const { data: drawings = [], isLoading: drawingsLoading } = useQuery<Drawing[]>({
     queryKey: ["/api/projects", projectId, "drawings"],
-    queryFn: () => fetch(`/api/projects/${projectId}/drawings`).then(res => res.json()) as Promise<Drawing[]>,
     enabled: !!projectId,
   });
 
   // Fetch takeoffs for all drawings
-  const { data: allTakeoffs = [] } = useQuery({
+  const { data: takeoffs = [], isLoading: takeoffsLoading } = useQuery<Takeoff[]>({
     queryKey: ["/api/projects", projectId, "takeoffs"],
-    queryFn: async () => {
-      const takeoffsPromises = drawings.map(drawing =>
-        fetch(`/api/drawings/${drawing.id}/takeoffs`).then(res => res.json())
-      );
-      const takeoffsArrays = await Promise.all(takeoffsPromises);
-      return takeoffsArrays.flat() as Takeoff[];
-    },
-    enabled: drawings.length > 0,
+    enabled: !!projectId,
   });
 
-  // Form for editing project
-  const form = useForm({
-    resolver: zodResolver(editProjectSchema),
-    defaultValues: {
-      name: project?.name || "",
-      description: project?.description || "",
-      location: project?.location || "",
-      client: project?.client || "",
-    },
+  // Fetch saved analyses
+  const { data: savedAnalyses = [] } = useQuery<SavedAnalysis[]>({
+    queryKey: ["/api/projects", projectId, "saved-analyses"],
+    enabled: !!projectId,
   });
 
-  // Update form when project data loads
-  if (project && !form.getValues().name) {
-    form.reset({
-      name: project.name,
-      description: project.description || "",
-      location: project.location || "",
-      client: project.client || "",
-    });
-  }
-
-  // Update project mutation
-  const updateProjectMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${projectId}`, "PATCH", data),
+  // Update takeoff mutation
+  const updateTakeoffMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest(`/api/takeoffs/${id}`, "PATCH", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      setIsEditing(false);
       toast({
-        title: "Project Updated",
-        description: "Project details have been saved successfully.",
+        title: "Takeoff updated",
+        description: "Takeoff has been updated successfully.",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "takeoffs"] });
+      setIsEditingTakeoff(null);
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: "Failed to update project. Please try again.",
+        title: "Failed to update takeoff",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: any) => {
-    updateProjectMutation.mutate(data);
+  // Save analysis mutation
+  const saveAnalysisMutation = useMutation({
+    mutationFn: (data: any) => apiRequest(`/api/projects/${projectId}/save-analysis`, "POST", data),
+    onSuccess: () => {
+      toast({
+        title: "Analysis saved",
+        description: "Analysis has been saved successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "saved-analyses"] });
+      setIsSaveAnalysisOpen(false);
+      setAnalysisName("");
+      setAnalysisDescription("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to save analysis",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete analysis mutation
+  const deleteAnalysisMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/saved-analyses/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast({
+        title: "Analysis deleted",
+        description: "Analysis has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "saved-analyses"] });
+      setIsDeleteAnalysisOpen(false);
+      setSelectedAnalysis(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete analysis",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditTakeoff = (takeoff: Takeoff) => {
+    setIsEditingTakeoff(takeoff.id);
+    setEditValues({
+      quantity: takeoff.quantity || 0,
+      costPerUnit: takeoff.costPerUnit || 0,
+      notes: takeoff.notes || ""
+    });
   };
 
-  if (!projectId) {
-    return <div>Project not found</div>;
+  const handleSaveTakeoff = (takeoffId: string) => {
+    const totalCost = editValues.quantity * editValues.costPerUnit;
+    updateTakeoffMutation.mutate({
+      id: takeoffId,
+      data: {
+        quantity: editValues.quantity,
+        costPerUnit: editValues.costPerUnit,
+        totalCost,
+        notes: editValues.notes,
+        verified: true
+      }
+    });
+  };
+
+  const handleSaveAnalysis = () => {
+    if (!analysisName.trim()) {
+      toast({
+        title: "Analysis name required",
+        description: "Please enter a name for the analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalItems = takeoffs.length;
+    const totalCost = takeoffs.reduce((sum: number, takeoff: Takeoff) => sum + (takeoff.totalCost || 0), 0);
+    const elementTypes = Array.from(new Set(takeoffs.map((t: Takeoff) => t.elementType)));
+
+    saveAnalysisMutation.mutate({
+      name: analysisName,
+      description: analysisDescription,
+      analysisData: {
+        takeoffs,
+        drawings,
+        timestamp: new Date().toISOString()
+      },
+      totalItems,
+      totalCost,
+      elementTypes
+    });
+  };
+
+  const handleDeleteAnalysis = (analysis: SavedAnalysis) => {
+    setSelectedAnalysis(analysis);
+    setIsDeleteAnalysisOpen(true);
+  };
+
+  const confirmDeleteAnalysis = () => {
+    if (selectedAnalysis) {
+      deleteAnalysisMutation.mutate(selectedAnalysis.id);
+    }
+  };
+
+  const exportTakeoffs = () => {
+    // Create CSV content
+    const headers = ["Element Type", "Item Name", "Quantity", "Unit", "Cost Per Unit", "Total Cost", "Notes", "Verified"];
+    const rows = takeoffs.map((takeoff: Takeoff) => [
+      takeoff.elementType,
+      takeoff.elementName,
+      takeoff.quantity?.toString() || "0",
+      takeoff.unit,
+      takeoff.costPerUnit?.toString() || "0",
+      takeoff.totalCost?.toString() || "0",
+      takeoff.notes || "",
+      takeoff.verified ? "Yes" : "No"
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map((cell: string) => `"${cell}"`).join(","))
+      .join("\n");
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project?.name || "project"}-takeoffs.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!match || !projectId) {
+    return null;
   }
 
   if (projectLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading project...</p>
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blueprint-600"></div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (!project) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
-          <p className="text-muted-foreground mb-4">The project you're looking for doesn't exist.</p>
+      <Layout>
+        <div className="text-center py-12">
+          <h3 className="text-lg font-medium text-slate-900 mb-2">Project Not Found</h3>
+          <p className="text-slate-600 mb-6">The requested project could not be found.</p>
           <Button onClick={() => setLocation("/projects")}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Projects
           </Button>
         </div>
-      </div>
+      </Layout>
     );
   }
 
-  // Calculate totals
-  const totalDrawings = drawings.length;
-  const processedDrawings = drawings.filter(d => d.status === "processed").length;
-  const totalEstimate = allTakeoffs.reduce((sum, takeoff) => sum + (takeoff.totalCost || 0), 0);
+  const totalCost = takeoffs.reduce((sum: number, takeoff: Takeoff) => sum + (takeoff.totalCost || 0), 0);
+  const totalItems = takeoffs.length;
+  const verifiedItems = takeoffs.filter((t: Takeoff) => t.verified).length;
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <Layout>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setLocation("/projects")}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Projects
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-            <p className="text-muted-foreground">
-              Created {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown'}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {!isEditing ? (
-            <Button onClick={() => setIsEditing(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Project
+      <div className="bg-white border-b border-slate-200 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setLocation("/projects")}
+              className="text-slate-600 hover:text-slate-900"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Projects
             </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsEditing(false);
-                  form.reset();
-                }}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-              <Button 
-                onClick={form.handleSubmit(onSubmit)}
-                disabled={updateProjectMutation.isPending}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {updateProjectMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{project?.name}</h1>
+              <p className="text-slate-600 mt-1">{project?.description || "No description provided"}</p>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Project Details */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isEditing ? (
-                <Form {...form}>
-                  <form className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Project Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter project name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="client"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Client</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter client name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter project location" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Enter project description" 
-                              rows={3}
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </form>
-                </Form>
-              ) : (
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <Dialog open={isSaveAnalysisOpen} onOpenChange={setIsSaveAnalysisOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Analysis
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Save Current Analysis</DialogTitle>
+                </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground">CLIENT</h3>
-                    <p className="text-lg">{project.client || "Not specified"}</p>
+                    <Label htmlFor="analysis-name">Analysis Name</Label>
+                    <Input
+                      id="analysis-name"
+                      value={analysisName}
+                      onChange={(e) => setAnalysisName(e.target.value)}
+                      placeholder="Enter analysis name"
+                    />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground">LOCATION</h3>
-                    <p className="text-lg">{project.location || "Not specified"}</p>
+                    <Label htmlFor="analysis-description">Description (Optional)</Label>
+                    <Textarea
+                      id="analysis-description"
+                      value={analysisDescription}
+                      onChange={(e) => setAnalysisDescription(e.target.value)}
+                      placeholder="Enter analysis description"
+                      rows={3}
+                    />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground">DESCRIPTION</h3>
-                    <p className="text-lg">{project.description || "No description provided"}</p>
+                  <div className="flex space-x-2 pt-4">
+                    <Button
+                      onClick={handleSaveAnalysis}
+                      disabled={saveAnalysisMutation.isPending}
+                      className="flex-1 bg-blueprint-600 hover:bg-blueprint-700"
+                    >
+                      {saveAnalysisMutation.isPending ? "Saving..." : "Save Analysis"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsSaveAnalysisOpen(false)}>
+                      Cancel
+                    </Button>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </DialogContent>
+            </Dialog>
 
-          {/* Drawings Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Drawings ({totalDrawings})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {drawingsLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">Loading drawings...</p>
-                </div>
-              ) : drawings.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground mb-4">No drawings uploaded yet</p>
-                  <Button>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload First Drawing
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {drawings.map((drawing) => (
-                    <div key={drawing.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="font-medium">{drawing.filename}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Uploaded {drawing.uploadedAt ? new Date(drawing.uploadedAt).toLocaleDateString() : 'Unknown'}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={drawing.status === "processed" ? "default" : "secondary"}>
-                        {drawing.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Takeoff Type Selection */}
-          {drawings.length > 0 && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold">Run AI Takeoff Analysis</h2>
-              <p className="text-muted-foreground">
-                Select which building elements you want to detect and measure in your drawings.
-              </p>
-              {drawings.map((drawing) => (
-                <div key={drawing.id} className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="font-medium">{drawing.filename}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Select takeoff types for this drawing
-                      </p>
-                    </div>
-                  </div>
-                  <TakeoffTypeSelector 
-                    drawing={drawing}
-                    onComplete={() => {
-                      // Refresh takeoffs data
-                      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "takeoffs"] });
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+            <Button onClick={exportTakeoffs} variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
 
-        {/* Project Stats Sidebar */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="w-5 h-5" />
-                Project Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Total Drawings</span>
-                <span className="font-semibold">{totalDrawings}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Processed</span>
-                <span className="font-semibold">{processedDrawings}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Total Estimate</span>
-                <span className="font-bold text-lg text-green-600">
-                  ${totalEstimate.toLocaleString()}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Takeoffs */}
-          {allTakeoffs.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Takeoffs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {allTakeoffs.slice(0, 5).map((takeoff) => (
-                    <div key={takeoff.id} className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium text-sm">{takeoff.itemType}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {takeoff.quantity} {takeoff.unit}
-                        </p>
-                      </div>
-                      <span className="font-semibold text-sm">
-                        ${(takeoff.totalCost || 0).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* Project Info */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-200">
+          <div className="flex items-center space-x-2 text-sm text-slate-600">
+            <MapPin className="w-4 h-4" />
+            <span>{project?.location || "No location specified"}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-slate-600">
+            <Building className="w-4 h-4" />
+            <span>{project?.client || "No client specified"}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-slate-600">
+            <Calendar className="w-4 h-4" />
+            <span>Created {project?.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown'}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge 
+              variant="secondary" 
+              className={
+                project?.status === "active" 
+                  ? "bg-green-100 text-green-700"
+                  : project?.status === "on-hold"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-slate-100 text-slate-700"
+              }
+            >
+              {project?.status}
+            </Badge>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Summary Cards */}
+      <div className="p-6 border-b border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileImage className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{drawings.length}</p>
+                  <p className="text-xs text-slate-500">Drawings</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <Calculator className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{totalItems}</p>
+                  <p className="text-xs text-slate-500">Total Items</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Check className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{verifiedItems}/{totalItems}</p>
+                  <p className="text-xs text-slate-500">Verified</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">${totalCost.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Total Cost</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        <Tabs defaultValue="takeoffs" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="takeoffs">Takeoffs</TabsTrigger>
+            <TabsTrigger value="saved-analyses">Saved Analyses</TabsTrigger>
+            <TabsTrigger value="drawings">Drawings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="takeoffs" className="space-y-4">
+            <div className="bg-white rounded-lg border border-slate-200">
+              <div className="p-4 border-b border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900">Takeoff Items</h3>
+                <p className="text-sm text-slate-600">Review and edit extracted quantities and costs</p>
+              </div>
+              
+              {takeoffsLoading ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blueprint-600 mx-auto"></div>
+                  <p className="text-slate-600 mt-2">Loading takeoffs...</p>
+                </div>
+              ) : takeoffs.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Calculator className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-slate-900 mb-2">No Takeoffs Yet</h4>
+                  <p className="text-slate-600">Upload drawings and run AI analysis to see takeoff items here.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {takeoffs.map((takeoff) => (
+                    <div key={takeoff.id} className="p-4">
+                      {isEditingTakeoff === takeoff.id ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-slate-900">{takeoff.elementName}</h4>
+                              <p className="text-sm text-slate-600">{takeoff.elementType}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveTakeoff(takeoff.id)}
+                                disabled={updateTakeoffMutation.isPending}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIsEditingTakeoff(null)}
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label htmlFor={`quantity-${takeoff.id}`}>Quantity</Label>
+                              <Input
+                                id={`quantity-${takeoff.id}`}
+                                type="number"
+                                value={editValues.quantity}
+                                onChange={(e) => setEditValues({
+                                  ...editValues,
+                                  quantity: parseFloat(e.target.value) || 0
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`cost-${takeoff.id}`}>Cost Per Unit ($)</Label>
+                              <Input
+                                id={`cost-${takeoff.id}`}
+                                type="number"
+                                step="0.01"
+                                value={editValues.costPerUnit}
+                                onChange={(e) => setEditValues({
+                                  ...editValues,
+                                  costPerUnit: parseFloat(e.target.value) || 0
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label>Total Cost</Label>
+                              <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm">
+                                ${(editValues.quantity * editValues.costPerUnit).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor={`notes-${takeoff.id}`}>Notes (Optional)</Label>
+                            <Textarea
+                              id={`notes-${takeoff.id}`}
+                              value={editValues.notes}
+                              onChange={(e) => setEditValues({
+                                ...editValues,
+                                notes: e.target.value
+                              })}
+                              placeholder="Add any notes about this item..."
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-slate-900">{takeoff.elementName}</h4>
+                              <div className="flex items-center space-x-2">
+                                {takeoff.verified && (
+                                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Verified
+                                  </Badge>
+                                )}
+                                {takeoff.detectedByAi && (
+                                  <Badge variant="outline" className="text-blue-600 border-blue-200">
+                                    AI Detected
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                              <div>
+                                <p className="text-slate-500">Type</p>
+                                <p className="font-medium">{takeoff.elementType}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500">Quantity</p>
+                                <p className="font-medium">{takeoff.quantity} {takeoff.unit}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500">Cost/Unit</p>
+                                <p className="font-medium">${takeoff.costPerUnit?.toLocaleString() || "0"}</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500">Total Cost</p>
+                                <p className="font-medium text-slate-900">${takeoff.totalCost?.toLocaleString() || "0"}</p>
+                              </div>
+                              <div className="flex items-center justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditTakeoff(takeoff)}
+                                >
+                                  <Edit className="w-4 h-4 mr-1" />
+                                  Edit
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {takeoff.notes && (
+                              <div className="mt-2 p-2 bg-slate-50 rounded text-sm">
+                                <p className="text-slate-600">{takeoff.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="saved-analyses" className="space-y-4">
+            <div className="bg-white rounded-lg border border-slate-200">
+              <div className="p-4 border-b border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900">Saved Analyses</h3>
+                <p className="text-sm text-slate-600">Previous analysis results and snapshots</p>
+              </div>
+              
+              {savedAnalyses.length === 0 ? (
+                <div className="p-8 text-center">
+                  <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-slate-900 mb-2">No Saved Analyses</h4>
+                  <p className="text-slate-600">Save your current analysis to create a snapshot of takeoff results.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {savedAnalyses.map((analysis) => (
+                    <div key={analysis.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-slate-900">{analysis.name}</h4>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Export
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteAnalysis(analysis)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          
+                          {analysis.description && (
+                            <p className="text-sm text-slate-600 mb-2">{analysis.description}</p>
+                          )}
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-slate-500">Items</p>
+                              <p className="font-medium">{analysis.totalItems}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Total Cost</p>
+                              <p className="font-medium">${analysis.totalCost?.toLocaleString() || "0"}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Elements</p>
+                              <p className="font-medium">{Array.isArray(analysis.elementTypes) ? analysis.elementTypes.length : 0} types</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Created</p>
+                              <p className="font-medium">{analysis.createdAt ? new Date(analysis.createdAt).toLocaleDateString() : 'Unknown'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="drawings" className="space-y-4">
+            <div className="bg-white rounded-lg border border-slate-200">
+              <div className="p-4 border-b border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900">Project Drawings</h3>
+                <p className="text-sm text-slate-600">Uploaded blueprints and floor plans</p>
+              </div>
+              
+              {drawingsLoading ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blueprint-600 mx-auto"></div>
+                  <p className="text-slate-600 mt-2">Loading drawings...</p>
+                </div>
+              ) : drawings.length === 0 ? (
+                <div className="p-8 text-center">
+                  <FileImage className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-slate-900 mb-2">No Drawings</h4>
+                  <p className="text-slate-600">Upload drawings to this project to get started with AI analysis.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                  {drawings.map((drawing) => (
+                    <Card key={drawing.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">{drawing.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Type:</span>
+                          <span className="font-medium">{drawing.fileType}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Status:</span>
+                          <Badge 
+                            variant="secondary"
+                            className={
+                              drawing.status === "complete"
+                                ? "bg-green-100 text-green-700"
+                                : drawing.status === "processing"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : drawing.status === "error"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-700"
+                            }
+                          >
+                            {drawing.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">AI Processed:</span>
+                          <Badge variant={drawing.aiProcessed ? "default" : "outline"}>
+                            {drawing.aiProcessed ? "Yes" : "No"}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Uploaded {drawing.uploadedAt ? new Date(drawing.uploadedAt).toLocaleDateString() : 'Unknown'}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Delete Analysis Dialog */}
+      <AlertDialog open={isDeleteAnalysisOpen} onOpenChange={setIsDeleteAnalysisOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Analysis</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedAnalysis?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteAnalysis}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Analysis
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Layout>
   );
 }

@@ -4,9 +4,10 @@ import {
   projects, 
   drawings, 
   takeoffs, 
-  materialCosts 
+  materialCosts,
+  savedAnalyses
 } from "@shared/schema";
-import { type Project, type InsertProject, type Drawing, type InsertDrawing, type Takeoff, type InsertTakeoff, type MaterialCost, type InsertMaterialCost } from "@shared/schema";
+import { type Project, type InsertProject, type Drawing, type InsertDrawing, type Takeoff, type InsertTakeoff, type MaterialCost, type InsertMaterialCost, type SavedAnalysis, type InsertSavedAnalysis } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -34,6 +35,13 @@ export interface IStorage {
   getMaterialCosts(): Promise<MaterialCost[]>;
   getMaterialCostsByCategory(category: string): Promise<MaterialCost[]>;
   createMaterialCost(cost: InsertMaterialCost): Promise<MaterialCost>;
+  
+  // Saved Analyses
+  getSavedAnalysis(id: string): Promise<SavedAnalysis | undefined>;
+  getSavedAnalysesByProject(projectId: string): Promise<SavedAnalysis[]>;
+  createSavedAnalysis(analysis: InsertSavedAnalysis): Promise<SavedAnalysis>;
+  updateSavedAnalysis(id: string, analysis: Partial<InsertSavedAnalysis>): Promise<SavedAnalysis | undefined>;
+  deleteSavedAnalysis(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -319,6 +327,38 @@ export class DatabaseStorage implements IStorage {
       .values({ ...insertCost, id: randomUUID() })
       .returning();
     return cost;
+  }
+
+  // Saved Analyses
+  async getSavedAnalysis(id: string): Promise<SavedAnalysis | undefined> {
+    const [analysis] = await db.select().from(savedAnalyses).where(eq(savedAnalyses.id, id));
+    return analysis;
+  }
+
+  async getSavedAnalysesByProject(projectId: string): Promise<SavedAnalysis[]> {
+    return await db.select().from(savedAnalyses).where(eq(savedAnalyses.projectId, projectId));
+  }
+
+  async createSavedAnalysis(insertAnalysis: InsertSavedAnalysis): Promise<SavedAnalysis> {
+    const [analysis] = await db
+      .insert(savedAnalyses)
+      .values({ ...insertAnalysis, id: randomUUID() })
+      .returning();
+    return analysis;
+  }
+
+  async updateSavedAnalysis(id: string, updateData: Partial<InsertSavedAnalysis>): Promise<SavedAnalysis | undefined> {
+    const [analysis] = await db
+      .update(savedAnalyses)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(savedAnalyses.id, id))
+      .returning();
+    return analysis;
+  }
+
+  async deleteSavedAnalysis(id: string): Promise<boolean> {
+    const result = await db.delete(savedAnalyses).where(eq(savedAnalyses.id, id));
+    return result.rowCount > 0;
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProjectSchema, insertDrawingSchema, insertTakeoffSchema } from "@shared/schema";
+import { insertProjectSchema, insertDrawingSchema, insertTakeoffSchema, insertSavedAnalysisSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -175,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/takeoffs/:id", async (req, res) => {
+  app.patch("/api/takeoffs/:id", async (req, res) => {
     try {
       const takeoffData = insertTakeoffSchema.partial().parse(req.body);
       const takeoff = await storage.updateTakeoff(req.params.id, takeoffData);
@@ -197,6 +197,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete takeoff" });
+    }
+  });
+
+  // Project-specific routes
+  app.get("/api/projects/:id/drawings", async (req, res) => {
+    try {
+      const drawings = await storage.getDrawingsByProject(req.params.id);
+      res.json(drawings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch project drawings" });
+    }
+  });
+
+  app.get("/api/projects/:id/takeoffs", async (req, res) => {
+    try {
+      const drawings = await storage.getDrawingsByProject(req.params.id);
+      let allTakeoffs: any[] = [];
+      for (const drawing of drawings) {
+        const takeoffs = await storage.getTakeoffsByDrawing(drawing.id);
+        allTakeoffs = allTakeoffs.concat(takeoffs);
+      }
+      res.json(allTakeoffs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch project takeoffs" });
+    }
+  });
+
+  app.get("/api/projects/:id/saved-analyses", async (req, res) => {
+    try {
+      const analyses = await storage.getSavedAnalysesByProject(req.params.id);
+      res.json(analyses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch saved analyses" });
+    }
+  });
+
+  app.post("/api/projects/:id/save-analysis", async (req, res) => {
+    try {
+      const analysisData = insertSavedAnalysisSchema.parse({
+        ...req.body,
+        projectId: req.params.id
+      });
+      const analysis = await storage.createSavedAnalysis(analysisData);
+      res.status(201).json(analysis);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid analysis data" });
+    }
+  });
+
+  // Saved analysis routes
+  app.get("/api/saved-analyses/:id", async (req, res) => {
+    try {
+      const analysis = await storage.getSavedAnalysis(req.params.id);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analysis" });
+    }
+  });
+
+  app.patch("/api/saved-analyses/:id", async (req, res) => {
+    try {
+      const updateData = insertSavedAnalysisSchema.partial().parse(req.body);
+      const analysis = await storage.updateSavedAnalysis(req.params.id, updateData);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+      res.json(analysis);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid analysis data" });
+    }
+  });
+
+  app.delete("/api/saved-analyses/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSavedAnalysis(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete analysis" });
     }
   });
 
@@ -547,7 +631,6 @@ async function generateEnhancedLLMTakeoffs(drawingId: string, elementTypes: stri
 }
 
 async function generateSelectiveMockTakeoffs(drawingId: string, elementTypes: string[]) {
-  const storage = getStorage() as IStorage;
   const takeoffTemplates = {
     doors: [
       {

@@ -9,6 +9,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description"),
   location: text("location"),
+  address: text("address"), // Keep to avoid data loss during migration
   client: text("client"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -46,6 +47,23 @@ export const takeoffs = pgTable("takeoffs", {
   detectedByAi: boolean("detected_by_ai").default(false),
   costPerUnit: real("cost_per_unit"),
   totalCost: real("total_cost"),
+  notes: text("notes"), // user notes for the takeoff item
+  verified: boolean("verified").default(false), // manually verified by user
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Add saved analyses table
+export const savedAnalyses = pgTable("saved_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id).notNull(),
+  drawingId: varchar("drawing_id").references(() => drawings.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  analysisData: jsonb("analysis_data").notNull(), // stores the complete analysis results
+  totalItems: integer("total_items").default(0),
+  totalCost: real("total_cost").default(0),
+  elementTypes: jsonb("element_types"), // array of analyzed element types
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -64,6 +82,7 @@ export const materialCosts = pgTable("material_costs", {
 // Define relations
 export const projectsRelations = relations(projects, ({ many }) => ({
   drawings: many(drawings),
+  savedAnalyses: many(savedAnalyses),
 }));
 
 export const drawingsRelations = relations(drawings, ({ one, many }) => ({
@@ -77,6 +96,17 @@ export const drawingsRelations = relations(drawings, ({ one, many }) => ({
 export const takeoffsRelations = relations(takeoffs, ({ one }) => ({
   drawing: one(drawings, {
     fields: [takeoffs.drawingId],
+    references: [drawings.id],
+  }),
+}));
+
+export const savedAnalysesRelations = relations(savedAnalyses, ({ one }) => ({
+  project: one(projects, {
+    fields: [savedAnalyses.projectId],
+    references: [projects.id],
+  }),
+  drawing: one(drawings, {
+    fields: [savedAnalyses.drawingId],
     references: [drawings.id],
   }),
 }));
@@ -105,6 +135,12 @@ export const insertMaterialCostSchema = createInsertSchema(materialCosts).omit({
   updatedAt: true,
 });
 
+export const insertSavedAnalysisSchema = createInsertSchema(savedAnalyses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
@@ -117,3 +153,6 @@ export type Takeoff = typeof takeoffs.$inferSelect;
 
 export type InsertMaterialCost = z.infer<typeof insertMaterialCostSchema>;
 export type MaterialCost = typeof materialCosts.$inferSelect;
+
+export type InsertSavedAnalysis = z.infer<typeof insertSavedAnalysisSchema>;
+export type SavedAnalysis = typeof savedAnalyses.$inferSelect;
