@@ -296,7 +296,14 @@ export default function Projects() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project: Project) => (
-              <Card key={project.id} className="hover:shadow-lg transition-shadow">
+              <Card 
+                key={project.id} 
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => {
+                  console.log('Navigating to project:', project.id);
+                  setLocation(`/projects/${project.id}`);
+                }}
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -318,18 +325,29 @@ export default function Projects() {
                       </Badge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditProject(project);
+                          }}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => handleDeleteProject(project)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteProject(project);
+                            }}
                             className="text-red-600 focus:text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -384,15 +402,7 @@ export default function Projects() {
                     </div>
                   </div>
 
-                  <Button 
-                    className="w-full mt-4 bg-blueprint-600 hover:bg-blueprint-700"
-                    onClick={() => {
-                      console.log('Navigating to project:', project.id);
-                      setLocation(`/projects/${project.id}`);
-                    }}
-                  >
-                    Open Project
-                  </Button>
+
                 </CardContent>
               </Card>
             ))}
