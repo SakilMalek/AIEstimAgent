@@ -6,7 +6,7 @@ import AIChatWidget from "@/components/ai-chat-widget";
 import RealtimeAnalysisPanel from "@/components/realtime-analysis-panel";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Download,
   Ruler,
@@ -65,6 +65,10 @@ export default function Dashboard() {
       };
       
       const project = await apiRequest("/api/projects", "POST", projectData);
+      
+      // Invalidate projects cache so the new project appears on the projects page
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      
       return project;
     } catch (error) {
       console.error("Failed to create project:", error);
@@ -74,21 +78,32 @@ export default function Dashboard() {
 
   const handleFileUpload = async (drawing: Drawing) => {
     try {
+      let projectToUse = currentProject;
+      
       // Create a new project if none exists
       if (!currentProject) {
-        const project = await createNewProject(drawing.name);
-        setCurrentProject(project);
-        
-        // Update the drawing with the correct project ID
-        drawing.projectId = project.id;
+        projectToUse = await createNewProject(drawing.name);
+        setCurrentProject(projectToUse);
         
         toast({
           title: "Project created",
-          description: `Created new project: ${project.name}`,
+          description: `Created new project: ${projectToUse.name}`,
         });
       }
       
-      setCurrentDrawing(drawing);
+      // Save the drawing to the database with the correct project ID
+      const drawingData = {
+        projectId: projectToUse!.id,
+        name: drawing.name,
+        filename: drawing.filename,
+        fileUrl: drawing.fileUrl,
+        fileType: drawing.fileType,
+        status: "complete",
+        aiProcessed: true,
+      };
+      
+      const savedDrawing = await apiRequest(`/api/projects/${projectToUse!.id}/drawings`, "POST", drawingData);
+      setCurrentDrawing(savedDrawing);
       
       // Auto-select common takeoff types if none are selected
       if (selectedTakeoffTypes.length === 0) {
