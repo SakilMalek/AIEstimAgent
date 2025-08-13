@@ -20,7 +20,19 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return res.json();
+  
+  // Handle 204 No Content responses (empty body)
+  if (res.status === 204) {
+    return null;
+  }
+  
+  // Only try to parse JSON if there's content
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return res.json();
+  }
+  
+  return res.text();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
