@@ -913,6 +913,226 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return result;
   }
+
+  // Smart Cost Analysis Backend Methods
+  async analyzeProjectCostEfficiency(projectId: string): Promise<{
+    overallScore: number;
+    totalCost: number;
+    averageCostPerSqFt: number;
+    costByCategory: Array<{ category: string; amount: number; percentage: number }>;
+    efficiency: 'excellent' | 'good' | 'average' | 'poor';
+    insights: string[];
+  }> {
+    // Get all drawings for this project first, then get takeoffs for all drawings
+    const projectDrawings = await db.select().from(drawings).where(eq(drawings.projectId, projectId));
+    let projectTakeoffs = [];
+    
+    if (projectDrawings.length > 0) {
+      const drawingIds = projectDrawings.map(d => d.id);
+      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`);
+    }
+    
+    if (projectTakeoffs.length === 0) {
+      return {
+        overallScore: 0,
+        totalCost: 0,
+        averageCostPerSqFt: 0,
+        costByCategory: [],
+        efficiency: 'poor',
+        insights: ['No takeoff data available for analysis']
+      };
+    }
+    
+    // Calculate total project cost
+    const totalCost = projectTakeoffs.reduce((sum, t) => sum + (t.totalCost || 0), 0);
+    
+    // Calculate area-based metrics
+    const totalArea = projectTakeoffs.reduce((sum, t) => sum + (t.area || 0), 0);
+    const averageCostPerSqFt = totalArea > 0 ? totalCost / totalArea : 0;
+    
+    // Categorize costs
+    const categoryTotals = new Map<string, number>();
+    projectTakeoffs.forEach(takeoff => {
+      const category = takeoff.elementType || 'Other';
+      categoryTotals.set(category, (categoryTotals.get(category) || 0) + (takeoff.totalCost || 0));
+    });
+    
+    const costByCategory = Array.from(categoryTotals.entries())
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: (amount / totalCost) * 100
+      }))
+      .sort((a, b) => b.amount - a.amount);
+    
+    // Calculate efficiency score (0-100)
+    let overallScore = 75; // Base score
+    
+    // Adjust based on cost distribution
+    const maxCategoryPercentage = costByCategory[0]?.percentage || 0;
+    if (maxCategoryPercentage > 50) overallScore -= 15; // Penalize over-concentration
+    if (maxCategoryPercentage < 25) overallScore += 10; // Reward balance
+    
+    // Adjust based on cost per square foot (industry benchmarks)
+    if (averageCostPerSqFt > 150) overallScore -= 10; // High cost
+    if (averageCostPerSqFt < 80) overallScore += 10; // Good value
+    
+    // Determine efficiency level
+    let efficiency: 'excellent' | 'good' | 'average' | 'poor';
+    if (overallScore >= 85) efficiency = 'excellent';
+    else if (overallScore >= 75) efficiency = 'good';
+    else if (overallScore >= 60) efficiency = 'average';
+    else efficiency = 'poor';
+    
+    // Generate insights
+    const insights = [];
+    if (totalCost > 100000) insights.push('Large project - consider bulk purchasing for savings');
+    if (maxCategoryPercentage > 40) insights.push(`${costByCategory[0].category} dominates costs (${maxCategoryPercentage.toFixed(1)}%)`);
+    if (averageCostPerSqFt > 120) insights.push('Above-average cost per sq ft - review material specifications');
+    if (costByCategory.length > 5) insights.push('Diverse cost categories - good for risk distribution');
+    
+    return {
+      overallScore,
+      totalCost,
+      averageCostPerSqFt,
+      costByCategory,
+      efficiency,
+      insights
+    };
+  }
+
+  async findCostSavingOpportunities(projectId: string): Promise<{
+    potentialSavings: number;
+    opportunities: Array<{
+      category: string;
+      description: string;
+      estimatedSavings: number;
+      priority: 'high' | 'medium' | 'low';
+    }>;
+  }> {
+    // Get all drawings for this project first, then get takeoffs for all drawings
+    const projectDrawings = await db.select().from(drawings).where(eq(drawings.projectId, projectId));
+    let projectTakeoffs = [];
+    
+    if (projectDrawings.length > 0) {
+      const drawingIds = projectDrawings.map(d => d.id);
+      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`);
+    }
+    const analysis = await this.analyzeProjectCostEfficiency(projectId);
+    
+    const opportunities = [];
+    let potentialSavings = 0;
+    
+    // High-cost category optimization
+    const highestCostCategory = analysis.costByCategory[0];
+    if (highestCostCategory && highestCostCategory.percentage > 35) {
+      const savings = highestCostCategory.amount * 0.1; // 10% potential savings
+      opportunities.push({
+        category: highestCostCategory.category,
+        description: `Optimize ${highestCostCategory.category} costs through value engineering`,
+        estimatedSavings: savings,
+        priority: 'high' as const
+      });
+      potentialSavings += savings;
+    }
+    
+    // Quantity optimization
+    const highQuantityItems = projectTakeoffs.filter(t => (t.quantity || 0) > 50);
+    if (highQuantityItems.length > 0) {
+      const savings = highQuantityItems.reduce((sum, item) => sum + (item.totalCost || 0), 0) * 0.05;
+      opportunities.push({
+        category: 'Bulk Purchase',
+        description: 'Negotiate bulk pricing for high-quantity items',
+        estimatedSavings: savings,
+        priority: 'medium' as const
+      });
+      potentialSavings += savings;
+    }
+    
+    // Material substitution
+    const expensiveItems = projectTakeoffs.filter(t => (t.costPerUnit || 0) > 100);
+    if (expensiveItems.length > 0) {
+      const savings = expensiveItems.reduce((sum, item) => sum + (item.totalCost || 0), 0) * 0.15;
+      opportunities.push({
+        category: 'Material Substitution',
+        description: 'Consider alternative materials for expensive items',
+        estimatedSavings: savings,
+        priority: 'medium' as const
+      });
+      potentialSavings += savings;
+    }
+    
+    return {
+      potentialSavings,
+      opportunities: opportunities.sort((a, b) => b.estimatedSavings - a.estimatedSavings)
+    };
+  }
+
+  async generateCostBenchmarkReport(projectId: string): Promise<{
+    projectCost: number;
+    industryAverage: number;
+    percentageVsAverage: number;
+    ranking: 'below-average' | 'average' | 'above-average' | 'premium';
+    factors: Array<{ factor: string; impact: number; description: string }>;
+  }> {
+    const analysis = await this.analyzeProjectCostEfficiency(projectId);
+    
+    // Simulated industry benchmarks (in production, this would come from real data)
+    const industryBenchmarks = {
+      averageCostPerSqFt: 95,
+      typicalCategoryDistribution: {
+        'flooring': 25,
+        'windows': 20,
+        'doors': 15,
+        'electrical': 15,
+        'walls': 12,
+        'other': 13
+      }
+    };
+    
+    const industryAverage = industryBenchmarks.averageCostPerSqFt;
+    const percentageVsAverage = ((analysis.averageCostPerSqFt - industryAverage) / industryAverage) * 100;
+    
+    let ranking: 'below-average' | 'average' | 'above-average' | 'premium';
+    if (percentageVsAverage < -10) ranking = 'below-average';
+    else if (percentageVsAverage < 10) ranking = 'average';
+    else if (percentageVsAverage < 25) ranking = 'above-average';
+    else ranking = 'premium';
+    
+    // Analyze cost factors
+    const factors = [];
+    
+    // Regional factor
+    factors.push({
+      factor: 'Regional Costs',
+      impact: Math.random() * 20 - 10, // Simulated regional impact
+      description: 'Regional cost variations compared to national average'
+    });
+    
+    // Material quality factor
+    const avgCostPerUnit = analysis.totalCost / (analysis.costByCategory.reduce((sum, cat) => sum + cat.amount, 0) || 1);
+    factors.push({
+      factor: 'Material Quality',
+      impact: avgCostPerUnit > 50 ? 15 : 5,
+      description: avgCostPerUnit > 50 ? 'Premium materials selected' : 'Standard materials used'
+    });
+    
+    // Project complexity
+    const categoryCount = analysis.costByCategory.length;
+    factors.push({
+      factor: 'Project Complexity',
+      impact: categoryCount > 6 ? 10 : 0,
+      description: categoryCount > 6 ? 'High complexity with many categories' : 'Standard complexity project'
+    });
+    
+    return {
+      projectCost: analysis.totalCost,
+      industryAverage,
+      percentageVsAverage,
+      ranking,
+      factors
+    };
+  }
 }
 
 export const storage = new DatabaseStorage();

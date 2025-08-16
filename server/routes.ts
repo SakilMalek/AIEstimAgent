@@ -953,6 +953,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Smart Cost Analysis API Routes
+  app.get("/api/projects/:projectId/cost-analysis", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const analysis = await storage.analyzeProjectCostEfficiency(projectId);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error analyzing project costs:", error);
+      res.status(500).json({ message: "Failed to analyze project costs" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/cost-savings", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const savings = await storage.findCostSavingOpportunities(projectId);
+      res.json(savings);
+    } catch (error) {
+      console.error("Error finding cost savings:", error);
+      res.status(500).json({ message: "Failed to find cost savings opportunities" });
+    }
+  });
+
+  app.get("/api/projects/:projectId/cost-benchmark", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const benchmark = await storage.generateCostBenchmarkReport(projectId);
+      res.json(benchmark);
+    } catch (error) {
+      console.error("Error generating cost benchmark:", error);
+      res.status(500).json({ message: "Failed to generate cost benchmark report" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
