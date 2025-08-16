@@ -2,7 +2,16 @@ import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProjectSchema, insertDrawingSchema, insertTakeoffSchema, insertSavedAnalysisSchema } from "@shared/schema";
+import { 
+  insertProjectSchema, 
+  insertDrawingSchema, 
+  insertTakeoffSchema, 
+  insertSavedAnalysisSchema,
+  insertTradeClassSchema,
+  insertProductSkuSchema,
+  insertProjectPricingSchema,
+  insertEstimateTemplateSchema
+} from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -460,6 +469,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to reprocess takeoff" });
+    }
+  });
+
+  // Trade Classes routes
+  app.get("/api/trade-classes", async (req, res) => {
+    try {
+      const tradeClasses = await storage.getTradeClasses();
+      res.json(tradeClasses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch trade classes" });
+    }
+  });
+
+  app.get("/api/trade-classes/:id", async (req, res) => {
+    try {
+      const tradeClass = await storage.getTradeClass(req.params.id);
+      if (!tradeClass) {
+        return res.status(404).json({ message: "Trade class not found" });
+      }
+      res.json(tradeClass);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch trade class" });
+    }
+  });
+
+  app.post("/api/trade-classes", async (req, res) => {
+    try {
+      const tradeClassData = insertTradeClassSchema.parse(req.body);
+      const tradeClass = await storage.createTradeClass(tradeClassData);
+      res.status(201).json(tradeClass);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid trade class data" });
+    }
+  });
+
+  app.patch("/api/trade-classes/:id", async (req, res) => {
+    try {
+      const updateData = insertTradeClassSchema.partial().parse(req.body);
+      const tradeClass = await storage.updateTradeClass(req.params.id, updateData);
+      if (!tradeClass) {
+        return res.status(404).json({ message: "Trade class not found" });
+      }
+      res.json(tradeClass);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid trade class data" });
+    }
+  });
+
+  app.delete("/api/trade-classes/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteTradeClass(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Trade class not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete trade class" });
+    }
+  });
+
+  // Product SKUs routes
+  app.get("/api/product-skus", async (req, res) => {
+    try {
+      const { trade_class_id, search } = req.query;
+      
+      if (search) {
+        const skus = await storage.searchProductSkus(search as string, trade_class_id as string);
+        res.json(skus);
+      } else if (trade_class_id) {
+        const skus = await storage.getProductSkusByTradeClass(trade_class_id as string);
+        res.json(skus);
+      } else {
+        const skus = await storage.getProductSkus();
+        res.json(skus);
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product SKUs" });
+    }
+  });
+
+  app.get("/api/product-skus/:id", async (req, res) => {
+    try {
+      const sku = await storage.getProductSku(req.params.id);
+      if (!sku) {
+        return res.status(404).json({ message: "Product SKU not found" });
+      }
+      res.json(sku);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product SKU" });
+    }
+  });
+
+  app.post("/api/product-skus", async (req, res) => {
+    try {
+      const skuData = insertProductSkuSchema.parse(req.body);
+      const sku = await storage.createProductSku(skuData);
+      res.status(201).json(sku);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid product SKU data" });
+    }
+  });
+
+  app.patch("/api/product-skus/:id", async (req, res) => {
+    try {
+      const updateData = insertProductSkuSchema.partial().parse(req.body);
+      const sku = await storage.updateProductSku(req.params.id, updateData);
+      if (!sku) {
+        return res.status(404).json({ message: "Product SKU not found" });
+      }
+      res.json(sku);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid product SKU data" });
+    }
+  });
+
+  app.delete("/api/product-skus/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProductSku(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Product SKU not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete product SKU" });
+    }
+  });
+
+  // Project Pricing routes
+  app.get("/api/projects/:projectId/pricing", async (req, res) => {
+    try {
+      const pricing = await storage.getProjectPricing(req.params.projectId);
+      res.json(pricing);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch project pricing" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/pricing", async (req, res) => {
+    try {
+      const pricingData = insertProjectPricingSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId
+      });
+      const pricing = await storage.createProjectPricing(pricingData);
+      res.status(201).json(pricing);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid project pricing data" });
+    }
+  });
+
+  app.patch("/api/project-pricing/:id", async (req, res) => {
+    try {
+      const updateData = insertProjectPricingSchema.partial().parse(req.body);
+      const pricing = await storage.updateProjectPricing(req.params.id, updateData);
+      if (!pricing) {
+        return res.status(404).json({ message: "Project pricing item not found" });
+      }
+      res.json(pricing);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid project pricing data" });
+    }
+  });
+
+  app.delete("/api/project-pricing/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProjectPricing(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Project pricing item not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete project pricing item" });
+    }
+  });
+
+  // Estimate Templates routes
+  app.get("/api/estimate-templates", async (req, res) => {
+    try {
+      const { trade_class_id } = req.query;
+      
+      if (trade_class_id) {
+        const templates = await storage.getEstimateTemplatesByTradeClass(trade_class_id as string);
+        res.json(templates);
+      } else {
+        const templates = await storage.getEstimateTemplates();
+        res.json(templates);
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch estimate templates" });
+    }
+  });
+
+  app.get("/api/estimate-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getEstimateTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Estimate template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch estimate template" });
+    }
+  });
+
+  app.post("/api/estimate-templates", async (req, res) => {
+    try {
+      const templateData = insertEstimateTemplateSchema.parse(req.body);
+      const template = await storage.createEstimateTemplate(templateData);
+      res.status(201).json(template);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid estimate template data" });
+    }
+  });
+
+  app.patch("/api/estimate-templates/:id", async (req, res) => {
+    try {
+      const updateData = insertEstimateTemplateSchema.partial().parse(req.body);
+      const template = await storage.updateEstimateTemplate(req.params.id, updateData);
+      if (!template) {
+        return res.status(404).json({ message: "Estimate template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid estimate template data" });
+    }
+  });
+
+  app.delete("/api/estimate-templates/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteEstimateTemplate(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Estimate template not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete estimate template" });
     }
   });
 

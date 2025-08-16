@@ -79,10 +79,115 @@ export const materialCosts = pgTable("material_costs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Trade classifications for organizing SKUs and pricing
+export const tradeClasses = pgTable("trade_classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  parentId: varchar("parent_id"), // for hierarchical structure - references self
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Product SKUs organized by trade class
+export const productSkus = pgTable("product_skus", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sku: text("sku").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  tradeClassId: varchar("trade_class_id").references(() => tradeClasses.id).notNull(),
+  category: text("category").notNull(),
+  subcategory: text("subcategory"),
+  unit: text("unit").notNull(),
+  unitSize: real("unit_size"), // e.g., 2x4x8 for lumber
+  unitDescription: text("unit_description"), // "per linear foot", "per sheet", etc.
+  materialCost: real("material_cost").notNull(),
+  laborCost: real("labor_cost").notNull(),
+  markupPercentage: real("markup_percentage").default(0.20), // 20% default markup
+  tags: jsonb("tags"), // array of searchable tags
+  specifications: jsonb("specifications"), // detailed product specs
+  vendor: text("vendor"),
+  vendorSku: text("vendor_sku"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Project-specific custom pricing overrides
+export const projectPricing = pgTable("project_pricing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id).notNull(),
+  skuId: varchar("sku_id").references(() => productSkus.id),
+  customSku: text("custom_sku"), // for one-off custom items
+  itemName: text("item_name").notNull(),
+  unit: text("unit").notNull(),
+  materialCost: real("material_cost").notNull(),
+  laborCost: real("labor_cost").notNull(),
+  markupPercentage: real("markup_percentage").default(0.20),
+  notes: text("notes"),
+  isCustom: boolean("is_custom").default(false), // true for custom items not in SKU catalog
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Estimate templates by trade class
+export const estimateTemplates = pgTable("estimate_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  tradeClassId: varchar("trade_class_id").references(() => tradeClasses.id).notNull(),
+  templateData: jsonb("template_data").notNull(), // structured template with line items
+  isPublic: boolean("is_public").default(false), // company-wide templates vs private
+  createdBy: text("created_by"), // user identifier
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Define relations
 export const projectsRelations = relations(projects, ({ many }) => ({
   drawings: many(drawings),
   savedAnalyses: many(savedAnalyses),
+  projectPricing: many(projectPricing),
+}));
+
+export const tradeClassesRelations = relations(tradeClasses, ({ one, many }) => ({
+  parent: one(tradeClasses, {
+    fields: [tradeClasses.parentId],
+    references: [tradeClasses.id],
+    relationName: "tradeClassParent",
+  }),
+  children: many(tradeClasses, {
+    relationName: "tradeClassParent",
+  }),
+  productSkus: many(productSkus),
+  estimateTemplates: many(estimateTemplates),
+}));
+
+export const productSkusRelations = relations(productSkus, ({ one, many }) => ({
+  tradeClass: one(tradeClasses, {
+    fields: [productSkus.tradeClassId],
+    references: [tradeClasses.id],
+  }),
+  projectPricing: many(projectPricing),
+}));
+
+export const projectPricingRelations = relations(projectPricing, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectPricing.projectId],
+    references: [projects.id],
+  }),
+  sku: one(productSkus, {
+    fields: [projectPricing.skuId],
+    references: [productSkus.id],
+  }),
+}));
+
+export const estimateTemplatesRelations = relations(estimateTemplates, ({ one }) => ({
+  tradeClass: one(tradeClasses, {
+    fields: [estimateTemplates.tradeClassId],
+    references: [tradeClasses.id],
+  }),
 }));
 
 export const drawingsRelations = relations(drawings, ({ one, many }) => ({
@@ -141,6 +246,30 @@ export const insertSavedAnalysisSchema = createInsertSchema(savedAnalyses).omit(
   updatedAt: true,
 });
 
+export const insertTradeClassSchema = createInsertSchema(tradeClasses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductSkuSchema = createInsertSchema(productSkus).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectPricingSchema = createInsertSchema(projectPricing).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEstimateTemplateSchema = createInsertSchema(estimateTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
@@ -156,3 +285,15 @@ export type MaterialCost = typeof materialCosts.$inferSelect;
 
 export type InsertSavedAnalysis = z.infer<typeof insertSavedAnalysisSchema>;
 export type SavedAnalysis = typeof savedAnalyses.$inferSelect;
+
+export type InsertTradeClass = z.infer<typeof insertTradeClassSchema>;
+export type TradeClass = typeof tradeClasses.$inferSelect;
+
+export type InsertProductSku = z.infer<typeof insertProductSkuSchema>;
+export type ProductSku = typeof productSkus.$inferSelect;
+
+export type InsertProjectPricing = z.infer<typeof insertProjectPricingSchema>;
+export type ProjectPricing = typeof projectPricing.$inferSelect;
+
+export type InsertEstimateTemplate = z.infer<typeof insertEstimateTemplateSchema>;
+export type EstimateTemplate = typeof estimateTemplates.$inferSelect;

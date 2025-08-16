@@ -1,13 +1,27 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { 
   projects, 
   drawings, 
   takeoffs, 
   materialCosts,
-  savedAnalyses
+  savedAnalyses,
+  tradeClasses,
+  productSkus,
+  projectPricing,
+  estimateTemplates
 } from "@shared/schema";
-import { type Project, type InsertProject, type Drawing, type InsertDrawing, type Takeoff, type InsertTakeoff, type MaterialCost, type InsertMaterialCost, type SavedAnalysis, type InsertSavedAnalysis } from "@shared/schema";
+import { 
+  type Project, type InsertProject, 
+  type Drawing, type InsertDrawing, 
+  type Takeoff, type InsertTakeoff, 
+  type MaterialCost, type InsertMaterialCost, 
+  type SavedAnalysis, type InsertSavedAnalysis,
+  type TradeClass, type InsertTradeClass,
+  type ProductSku, type InsertProductSku,
+  type ProjectPricing, type InsertProjectPricing,
+  type EstimateTemplate, type InsertEstimateTemplate
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -42,6 +56,37 @@ export interface IStorage {
   createSavedAnalysis(analysis: InsertSavedAnalysis): Promise<SavedAnalysis>;
   updateSavedAnalysis(id: string, analysis: Partial<InsertSavedAnalysis>): Promise<SavedAnalysis | undefined>;
   deleteSavedAnalysis(id: string): Promise<boolean>;
+
+  // Trade Classes
+  getTradeClasses(): Promise<TradeClass[]>;
+  getTradeClass(id: string): Promise<TradeClass | undefined>;
+  createTradeClass(tradeClass: InsertTradeClass): Promise<TradeClass>;
+  updateTradeClass(id: string, tradeClass: Partial<InsertTradeClass>): Promise<TradeClass | undefined>;
+  deleteTradeClass(id: string): Promise<boolean>;
+
+  // Product SKUs
+  getProductSkus(): Promise<ProductSku[]>;
+  getProductSkusByTradeClass(tradeClassId: string): Promise<ProductSku[]>;
+  getProductSku(id: string): Promise<ProductSku | undefined>;
+  searchProductSkus(query: string, tradeClassId?: string): Promise<ProductSku[]>;
+  createProductSku(sku: InsertProductSku): Promise<ProductSku>;
+  updateProductSku(id: string, sku: Partial<InsertProductSku>): Promise<ProductSku | undefined>;
+  deleteProductSku(id: string): Promise<boolean>;
+
+  // Project Pricing
+  getProjectPricing(projectId: string): Promise<ProjectPricing[]>;
+  getProjectPricingItem(id: string): Promise<ProjectPricing | undefined>;
+  createProjectPricing(pricing: InsertProjectPricing): Promise<ProjectPricing>;
+  updateProjectPricing(id: string, pricing: Partial<InsertProjectPricing>): Promise<ProjectPricing | undefined>;
+  deleteProjectPricing(id: string): Promise<boolean>;
+
+  // Estimate Templates
+  getEstimateTemplates(): Promise<EstimateTemplate[]>;
+  getEstimateTemplatesByTradeClass(tradeClassId: string): Promise<EstimateTemplate[]>;
+  getEstimateTemplate(id: string): Promise<EstimateTemplate | undefined>;
+  createEstimateTemplate(template: InsertEstimateTemplate): Promise<EstimateTemplate>;
+  updateEstimateTemplate(id: string, template: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined>;
+  deleteEstimateTemplate(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -202,6 +247,53 @@ export class DatabaseStorage implements IStorage {
         description: "Oak hardwood flooring with installation",
       },
     ]);
+
+    // Sample trade classes
+    await db.insert(tradeClasses).values([
+      { id: "trade-1", name: "General Construction", code: "GC", description: "General construction and framing" },
+      { id: "trade-2", name: "Electrical", code: "ELEC", description: "Electrical systems and components" },
+      { id: "trade-3", name: "Plumbing", code: "PLUMB", description: "Plumbing systems and fixtures" },
+      { id: "trade-4", name: "HVAC", code: "HVAC", description: "Heating, ventilation, and air conditioning" },
+      { id: "trade-5", name: "Flooring", code: "FLOOR", description: "All types of flooring materials and installation" },
+      { id: "trade-6", name: "Windows & Doors", code: "WD", description: "Windows, doors, and related hardware" },
+      { id: "trade-7", name: "Roofing", code: "ROOF", description: "Roofing materials and installation" },
+      { id: "trade-8", name: "Insulation", code: "INSUL", description: "Insulation materials and installation" },
+    ]);
+
+    // Sample product SKUs
+    await db.insert(productSkus).values([
+      // General Construction
+      { id: "sku-1", sku: "LUM-2X4-8", name: "2x4x8 Lumber", tradeClassId: "trade-1", category: "Lumber", unit: "piece", materialCost: 6.50, laborCost: 2.00, description: "Standard 2x4x8 construction lumber" },
+      { id: "sku-2", sku: "LUM-2X6-8", name: "2x6x8 Lumber", tradeClassId: "trade-1", category: "Lumber", unit: "piece", materialCost: 9.75, laborCost: 2.50, description: "Standard 2x6x8 construction lumber" },
+      { id: "sku-3", sku: "PLY-3/4-4X8", name: "3/4\" Plywood 4x8", tradeClassId: "trade-1", category: "Sheathing", unit: "sheet", materialCost: 58.00, laborCost: 15.00, description: "3/4 inch plywood sheet 4x8 feet" },
+      
+      // Electrical
+      { id: "sku-4", sku: "ELEC-OUT-STD", name: "Standard Electrical Outlet", tradeClassId: "trade-2", category: "Outlets", unit: "each", materialCost: 12.50, laborCost: 45.00, description: "Standard 15A electrical outlet with installation" },
+      { id: "sku-5", sku: "ELEC-SW-STD", name: "Standard Light Switch", tradeClassId: "trade-2", category: "Switches", unit: "each", materialCost: 8.75, laborCost: 35.00, description: "Standard single-pole light switch" },
+      { id: "sku-6", sku: "WIRE-12-2", name: "12-2 Romex Wire", tradeClassId: "trade-2", category: "Wiring", unit: "ft", materialCost: 0.85, laborCost: 1.25, description: "12 AWG 2-conductor Romex wire" },
+      
+      // Plumbing
+      { id: "sku-7", sku: "PIPE-PVC-4", name: "4\" PVC Pipe", tradeClassId: "trade-3", category: "Pipe", unit: "ft", materialCost: 3.25, laborCost: 8.50, description: "4 inch PVC drain pipe" },
+      { id: "sku-8", sku: "FIX-TOILET-STD", name: "Standard Toilet", tradeClassId: "trade-3", category: "Fixtures", unit: "each", materialCost: 285.00, laborCost: 175.00, description: "Standard two-piece toilet with installation" },
+      
+      // HVAC
+      { id: "sku-9", sku: "DUCT-6", name: "6\" Flexible Ductwork", tradeClassId: "trade-4", category: "Ductwork", unit: "ft", materialCost: 4.50, laborCost: 6.25, description: "6 inch flexible HVAC ductwork" },
+      { id: "sku-10", sku: "VENT-CEIL", name: "Ceiling Vent Register", tradeClassId: "trade-4", category: "Vents", unit: "each", materialCost: 28.00, laborCost: 45.00, description: "Standard ceiling vent register" },
+      
+      // Flooring
+      { id: "sku-11", sku: "FLOOR-OAK-34", name: "3/4\" Oak Hardwood", tradeClassId: "trade-5", category: "Hardwood", unit: "sq ft", materialCost: 8.50, laborCost: 6.00, description: "3/4 inch solid oak hardwood flooring" },
+      { id: "sku-12", sku: "TILE-POR-12X24", name: "12x24 Porcelain Tile", tradeClassId: "trade-5", category: "Tile", unit: "sq ft", materialCost: 4.25, laborCost: 8.75, description: "12x24 inch porcelain floor tile" },
+      
+      // Windows & Doors
+      { id: "sku-13", sku: "WIN-DH-3X4", name: "3x4 Double Hung Window", tradeClassId: "trade-6", category: "Windows", unit: "each", materialCost: 350.00, laborCost: 200.00, description: "3x4 feet double hung vinyl window" },
+      { id: "sku-14", sku: "DOOR-INT-32", name: "32\" Interior Door", tradeClassId: "trade-6", category: "Doors", unit: "each", materialCost: 180.00, laborCost: 150.00, description: "32 inch hollow core interior door" },
+      
+      // Roofing
+      { id: "sku-15", sku: "SHIN-ARCH-30", name: "30-Year Architectural Shingles", tradeClassId: "trade-7", category: "Shingles", unit: "sq", materialCost: 125.00, laborCost: 85.00, description: "30-year architectural asphalt shingles per square" },
+      
+      // Insulation
+      { id: "sku-16", sku: "INSUL-FG-R15", name: "R-15 Fiberglass Insulation", tradeClassId: "trade-8", category: "Batts", unit: "sq ft", materialCost: 1.25, laborCost: 0.75, description: "R-15 fiberglass batt insulation" },
+    ]);
     
     this.initialized = true;
     console.log("Sample data initialized successfully");
@@ -358,6 +450,152 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSavedAnalysis(id: string): Promise<boolean> {
     const result = await db.delete(savedAnalyses).where(eq(savedAnalyses.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Trade Classes
+  async getTradeClasses(): Promise<TradeClass[]> {
+    return await db.select().from(tradeClasses);
+  }
+
+  async getTradeClass(id: string): Promise<TradeClass | undefined> {
+    const [tradeClass] = await db.select().from(tradeClasses).where(eq(tradeClasses.id, id));
+    return tradeClass;
+  }
+
+  async createTradeClass(insertTradeClass: InsertTradeClass): Promise<TradeClass> {
+    const [tradeClass] = await db
+      .insert(tradeClasses)
+      .values({ ...insertTradeClass, id: randomUUID() })
+      .returning();
+    return tradeClass;
+  }
+
+  async updateTradeClass(id: string, updateData: Partial<InsertTradeClass>): Promise<TradeClass | undefined> {
+    const [tradeClass] = await db
+      .update(tradeClasses)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(tradeClasses.id, id))
+      .returning();
+    return tradeClass;
+  }
+
+  async deleteTradeClass(id: string): Promise<boolean> {
+    const result = await db.delete(tradeClasses).where(eq(tradeClasses.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Product SKUs
+  async getProductSkus(): Promise<ProductSku[]> {
+    return await db.select().from(productSkus);
+  }
+
+  async getProductSkusByTradeClass(tradeClassId: string): Promise<ProductSku[]> {
+    return await db.select().from(productSkus).where(eq(productSkus.tradeClassId, tradeClassId));
+  }
+
+  async getProductSku(id: string): Promise<ProductSku | undefined> {
+    const [sku] = await db.select().from(productSkus).where(eq(productSkus.id, id));
+    return sku;
+  }
+
+  async searchProductSkus(query: string, tradeClassId?: string): Promise<ProductSku[]> {
+    let conditions = sql`${productSkus.name} ILIKE ${'%' + query + '%'} OR ${productSkus.description} ILIKE ${'%' + query + '%'} OR ${productSkus.sku} ILIKE ${'%' + query + '%'}`;
+    
+    if (tradeClassId) {
+      conditions = sql`${conditions} AND ${productSkus.tradeClassId} = ${tradeClassId}`;
+    }
+    
+    return await db.select().from(productSkus).where(conditions);
+  }
+
+  async createProductSku(insertSku: InsertProductSku): Promise<ProductSku> {
+    const [sku] = await db
+      .insert(productSkus)
+      .values({ ...insertSku, id: randomUUID() })
+      .returning();
+    return sku;
+  }
+
+  async updateProductSku(id: string, updateData: Partial<InsertProductSku>): Promise<ProductSku | undefined> {
+    const [sku] = await db
+      .update(productSkus)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(productSkus.id, id))
+      .returning();
+    return sku;
+  }
+
+  async deleteProductSku(id: string): Promise<boolean> {
+    const result = await db.delete(productSkus).where(eq(productSkus.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Project Pricing
+  async getProjectPricing(projectId: string): Promise<ProjectPricing[]> {
+    return await db.select().from(projectPricing).where(eq(projectPricing.projectId, projectId));
+  }
+
+  async getProjectPricingItem(id: string): Promise<ProjectPricing | undefined> {
+    const [pricing] = await db.select().from(projectPricing).where(eq(projectPricing.id, id));
+    return pricing;
+  }
+
+  async createProjectPricing(insertPricing: InsertProjectPricing): Promise<ProjectPricing> {
+    const [pricing] = await db
+      .insert(projectPricing)
+      .values({ ...insertPricing, id: randomUUID() })
+      .returning();
+    return pricing;
+  }
+
+  async updateProjectPricing(id: string, updateData: Partial<InsertProjectPricing>): Promise<ProjectPricing | undefined> {
+    const [pricing] = await db
+      .update(projectPricing)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(projectPricing.id, id))
+      .returning();
+    return pricing;
+  }
+
+  async deleteProjectPricing(id: string): Promise<boolean> {
+    const result = await db.delete(projectPricing).where(eq(projectPricing.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Estimate Templates
+  async getEstimateTemplates(): Promise<EstimateTemplate[]> {
+    return await db.select().from(estimateTemplates);
+  }
+
+  async getEstimateTemplatesByTradeClass(tradeClassId: string): Promise<EstimateTemplate[]> {
+    return await db.select().from(estimateTemplates).where(eq(estimateTemplates.tradeClassId, tradeClassId));
+  }
+
+  async getEstimateTemplate(id: string): Promise<EstimateTemplate | undefined> {
+    const [template] = await db.select().from(estimateTemplates).where(eq(estimateTemplates.id, id));
+    return template;
+  }
+
+  async createEstimateTemplate(insertTemplate: InsertEstimateTemplate): Promise<EstimateTemplate> {
+    const [template] = await db
+      .insert(estimateTemplates)
+      .values({ ...insertTemplate, id: randomUUID() })
+      .returning();
+    return template;
+  }
+
+  async updateEstimateTemplate(id: string, updateData: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined> {
+    const [template] = await db
+      .update(estimateTemplates)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(estimateTemplates.id, id))
+      .returning();
+    return template;
+  }
+
+  async deleteEstimateTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(estimateTemplates).where(eq(estimateTemplates.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }

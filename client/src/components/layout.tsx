@@ -62,6 +62,20 @@ export default function Layout({ children }: LayoutProps) {
                 Projects
               </Button>
             </Link>
+            <Link href="/projects-manager">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={
+                  location === "/projects-manager"
+                    ? "text-blueprint-700 bg-blueprint-50 hover:bg-blueprint-100"
+                    : "text-slate-600 hover:text-blueprint-700"
+                }
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Manager
+              </Button>
+            </Link>
             <Link href="/reports">
               <Button
                 variant="ghost"
