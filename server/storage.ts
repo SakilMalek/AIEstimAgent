@@ -9,7 +9,14 @@ import {
   tradeClasses,
   productSkus,
   projectPricing,
-  estimateTemplates
+  estimateTemplates,
+  regionalCostDatabase,
+  suppliers,
+  materialPricing,
+  changeOrders,
+  profitMarginSettings,
+  costHistory,
+  costEscalation
 } from "@shared/schema";
 import { 
   type Project, type InsertProject, 
@@ -20,7 +27,14 @@ import {
   type TradeClass, type InsertTradeClass,
   type ProductSku, type InsertProductSku,
   type ProjectPricing, type InsertProjectPricing,
-  type EstimateTemplate, type InsertEstimateTemplate
+  type EstimateTemplate, type InsertEstimateTemplate,
+  type RegionalCostDatabase, type InsertRegionalCostDatabase,
+  type Supplier, type InsertSupplier,
+  type MaterialPricing, type InsertMaterialPricing,
+  type ChangeOrder, type InsertChangeOrder,
+  type ProfitMarginSettings, type InsertProfitMarginSettings,
+  type CostHistory, type InsertCostHistory,
+  type CostEscalation, type InsertCostEscalation
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -87,6 +101,55 @@ export interface IStorage {
   createEstimateTemplate(template: InsertEstimateTemplate): Promise<EstimateTemplate>;
   updateEstimateTemplate(id: string, template: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined>;
   deleteEstimateTemplate(id: string): Promise<boolean>;
+
+  // Regional Cost Database
+  getRegionalCostData(): Promise<RegionalCostDatabase[]>;
+  getRegionalCostDataByLocation(region?: string, state?: string, zipCode?: string): Promise<RegionalCostDatabase[]>;
+  createRegionalCostData(data: InsertRegionalCostDatabase): Promise<RegionalCostDatabase>;
+  updateRegionalCostData(id: string, data: Partial<InsertRegionalCostDatabase>): Promise<RegionalCostDatabase | undefined>;
+
+  // Supplier Management
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  getSuppliersBySpecialty(specialty: string): Promise<Supplier[]>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  deleteSupplier(id: string): Promise<boolean>;
+
+  // Material Pricing
+  getMaterialPricing(): Promise<MaterialPricing[]>;
+  getMaterialPricingBySku(skuId: string): Promise<MaterialPricing[]>;
+  getMaterialPricingBySupplier(supplierId: string): Promise<MaterialPricing[]>;
+  getBestPriceForSku(skuId: string): Promise<MaterialPricing | undefined>;
+  createMaterialPricing(pricing: InsertMaterialPricing): Promise<MaterialPricing>;
+  updateMaterialPricing(id: string, pricing: Partial<InsertMaterialPricing>): Promise<MaterialPricing | undefined>;
+
+  // Change Orders
+  getChangeOrders(): Promise<ChangeOrder[]>;
+  getChangeOrdersByProject(projectId: string): Promise<ChangeOrder[]>;
+  getChangeOrder(id: string): Promise<ChangeOrder | undefined>;
+  createChangeOrder(changeOrder: InsertChangeOrder): Promise<ChangeOrder>;
+  updateChangeOrder(id: string, changeOrder: Partial<InsertChangeOrder>): Promise<ChangeOrder | undefined>;
+  deleteChangeOrder(id: string): Promise<boolean>;
+
+  // Profit Margin Settings
+  getProfitMarginSettings(): Promise<ProfitMarginSettings[]>;
+  getProfitMarginSettingsByScope(scope: string, scopeId?: string): Promise<ProfitMarginSettings[]>;
+  createProfitMarginSettings(settings: InsertProfitMarginSettings): Promise<ProfitMarginSettings>;
+  updateProfitMarginSettings(id: string, settings: Partial<InsertProfitMarginSettings>): Promise<ProfitMarginSettings | undefined>;
+
+  // Cost History and Trending
+  getCostHistory(): Promise<CostHistory[]>;
+  getCostHistoryBySku(skuId: string): Promise<CostHistory[]>;
+  getCostTrend(skuId: string, days: number): Promise<CostHistory[]>;
+  createCostHistory(history: InsertCostHistory): Promise<CostHistory>;
+
+  // Cost Escalation
+  getCostEscalation(): Promise<CostEscalation[]>;
+  getCostEscalationByProject(projectId: string): Promise<CostEscalation[]>;
+  getActiveCostEscalation(projectId: string): Promise<CostEscalation[]>;
+  createCostEscalation(escalation: InsertCostEscalation): Promise<CostEscalation>;
+  updateCostEscalation(id: string, escalation: Partial<InsertCostEscalation>): Promise<CostEscalation | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -609,6 +672,246 @@ export class DatabaseStorage implements IStorage {
   async deleteEstimateTemplate(id: string): Promise<boolean> {
     const result = await db.delete(estimateTemplates).where(eq(estimateTemplates.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Regional Cost Database Methods
+  async getRegionalCostData(): Promise<RegionalCostDatabase[]> {
+    return await db.select().from(regionalCostDatabase);
+  }
+
+  async getRegionalCostDataByLocation(region?: string, state?: string, zipCode?: string): Promise<RegionalCostDatabase[]> {
+    let query = db.select().from(regionalCostDatabase);
+    
+    if (region) {
+      query = query.where(eq(regionalCostDatabase.region, region));
+    }
+    if (state) {
+      query = query.where(eq(regionalCostDatabase.state, state));
+    }
+    if (zipCode) {
+      query = query.where(eq(regionalCostDatabase.zipCode, zipCode));
+    }
+
+    return await query;
+  }
+
+  async createRegionalCostData(data: InsertRegionalCostDatabase): Promise<RegionalCostDatabase> {
+    const [result] = await db.insert(regionalCostDatabase).values(data).returning();
+    return result;
+  }
+
+  async updateRegionalCostData(id: string, data: Partial<InsertRegionalCostDatabase>): Promise<RegionalCostDatabase | undefined> {
+    const [result] = await db.update(regionalCostDatabase)
+      .set({ ...data, lastUpdated: new Date() })
+      .where(eq(regionalCostDatabase.id, id))
+      .returning();
+    return result;
+  }
+
+  // Supplier Management Methods
+  async getSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers).where(eq(suppliers.isActive, true));
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const [result] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return result;
+  }
+
+  async getSuppliersBySpecialty(specialty: string): Promise<Supplier[]> {
+    return await db.select().from(suppliers)
+      .where(sql`${suppliers.specialties} @> ${JSON.stringify([specialty])}`);
+  }
+
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    const [result] = await db.insert(suppliers).values(supplier).returning();
+    return result;
+  }
+
+  async updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const [result] = await db.update(suppliers)
+      .set({ ...supplier, updatedAt: new Date() })
+      .where(eq(suppliers.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteSupplier(id: string): Promise<boolean> {
+    const result = await db.update(suppliers)
+      .set({ isActive: false })
+      .where(eq(suppliers.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Material Pricing Methods
+  async getMaterialPricing(): Promise<MaterialPricing[]> {
+    return await db.select().from(materialPricing);
+  }
+
+  async getMaterialPricingBySku(skuId: string): Promise<MaterialPricing[]> {
+    return await db.select().from(materialPricing)
+      .where(eq(materialPricing.skuId, skuId))
+      .orderBy(materialPricing.currentPrice);
+  }
+
+  async getMaterialPricingBySupplier(supplierId: string): Promise<MaterialPricing[]> {
+    return await db.select().from(materialPricing)
+      .where(eq(materialPricing.supplierId, supplierId));
+  }
+
+  async getBestPriceForSku(skuId: string): Promise<MaterialPricing | undefined> {
+    const [result] = await db.select().from(materialPricing)
+      .where(eq(materialPricing.skuId, skuId))
+      .orderBy(materialPricing.currentPrice)
+      .limit(1);
+    return result;
+  }
+
+  async createMaterialPricing(pricing: InsertMaterialPricing): Promise<MaterialPricing> {
+    const [result] = await db.insert(materialPricing).values(pricing).returning();
+    return result;
+  }
+
+  async updateMaterialPricing(id: string, pricing: Partial<InsertMaterialPricing>): Promise<MaterialPricing | undefined> {
+    const [result] = await db.update(materialPricing)
+      .set({ ...pricing, lastUpdated: new Date() })
+      .where(eq(materialPricing.id, id))
+      .returning();
+    return result;
+  }
+
+  // Change Order Methods
+  async getChangeOrders(): Promise<ChangeOrder[]> {
+    return await db.select().from(changeOrders);
+  }
+
+  async getChangeOrdersByProject(projectId: string): Promise<ChangeOrder[]> {
+    return await db.select().from(changeOrders)
+      .where(eq(changeOrders.projectId, projectId))
+      .orderBy(changeOrders.createdAt);
+  }
+
+  async getChangeOrder(id: string): Promise<ChangeOrder | undefined> {
+    const [result] = await db.select().from(changeOrders).where(eq(changeOrders.id, id));
+    return result;
+  }
+
+  async createChangeOrder(changeOrder: InsertChangeOrder): Promise<ChangeOrder> {
+    // Generate change order number if not provided
+    if (!changeOrder.changeOrderNumber) {
+      const projectChangeOrders = await this.getChangeOrdersByProject(changeOrder.projectId);
+      changeOrder.changeOrderNumber = `CO-${String(projectChangeOrders.length + 1).padStart(3, '0')}`;
+    }
+
+    const [result] = await db.insert(changeOrders).values(changeOrder).returning();
+    return result;
+  }
+
+  async updateChangeOrder(id: string, changeOrder: Partial<InsertChangeOrder>): Promise<ChangeOrder | undefined> {
+    const [result] = await db.update(changeOrders)
+      .set({ ...changeOrder, updatedAt: new Date() })
+      .where(eq(changeOrders.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteChangeOrder(id: string): Promise<boolean> {
+    const result = await db.delete(changeOrders).where(eq(changeOrders.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Profit Margin Settings Methods
+  async getProfitMarginSettings(): Promise<ProfitMarginSettings[]> {
+    return await db.select().from(profitMarginSettings)
+      .where(eq(profitMarginSettings.isActive, true));
+  }
+
+  async getProfitMarginSettingsByScope(scope: string, scopeId?: string): Promise<ProfitMarginSettings[]> {
+    let query = db.select().from(profitMarginSettings)
+      .where(eq(profitMarginSettings.scope, scope));
+
+    if (scopeId) {
+      if (scope === 'project') {
+        query = query.where(eq(profitMarginSettings.projectId, scopeId));
+      } else if (scope === 'trade_class') {
+        query = query.where(eq(profitMarginSettings.tradeClassId, scopeId));
+      }
+    }
+
+    return await query.where(eq(profitMarginSettings.isActive, true));
+  }
+
+  async createProfitMarginSettings(settings: InsertProfitMarginSettings): Promise<ProfitMarginSettings> {
+    const [result] = await db.insert(profitMarginSettings).values(settings).returning();
+    return result;
+  }
+
+  async updateProfitMarginSettings(id: string, settings: Partial<InsertProfitMarginSettings>): Promise<ProfitMarginSettings | undefined> {
+    const [result] = await db.update(profitMarginSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(profitMarginSettings.id, id))
+      .returning();
+    return result;
+  }
+
+  // Cost History Methods
+  async getCostHistory(): Promise<CostHistory[]> {
+    return await db.select().from(costHistory)
+      .orderBy(costHistory.recordDate);
+  }
+
+  async getCostHistoryBySku(skuId: string): Promise<CostHistory[]> {
+    return await db.select().from(costHistory)
+      .where(eq(costHistory.skuId, skuId))
+      .orderBy(costHistory.recordDate);
+  }
+
+  async getCostTrend(skuId: string, days: number): Promise<CostHistory[]> {
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - days);
+
+    return await db.select().from(costHistory)
+      .where(eq(costHistory.skuId, skuId))
+      .where(sql`${costHistory.recordDate} >= ${dateThreshold}`)
+      .orderBy(costHistory.recordDate);
+  }
+
+  async createCostHistory(history: InsertCostHistory): Promise<CostHistory> {
+    const [result] = await db.insert(costHistory).values(history).returning();
+    return result;
+  }
+
+  // Cost Escalation Methods
+  async getCostEscalation(): Promise<CostEscalation[]> {
+    return await db.select().from(costEscalation);
+  }
+
+  async getCostEscalationByProject(projectId: string): Promise<CostEscalation[]> {
+    return await db.select().from(costEscalation)
+      .where(eq(costEscalation.projectId, projectId))
+      .orderBy(costEscalation.effectiveDate);
+  }
+
+  async getActiveCostEscalation(projectId: string): Promise<CostEscalation[]> {
+    const currentDate = new Date();
+    return await db.select().from(costEscalation)
+      .where(eq(costEscalation.projectId, projectId))
+      .where(eq(costEscalation.isActive, true))
+      .where(sql`${costEscalation.effectiveDate} <= ${currentDate}`)
+      .where(sql`${costEscalation.endDate} IS NULL OR ${costEscalation.endDate} > ${currentDate}`);
+  }
+
+  async createCostEscalation(escalation: InsertCostEscalation): Promise<CostEscalation> {
+    const [result] = await db.insert(costEscalation).values(escalation).returning();
+    return result;
+  }
+
+  async updateCostEscalation(id: string, escalation: Partial<InsertCostEscalation>): Promise<CostEscalation | undefined> {
+    const [result] = await db.update(costEscalation)
+      .set({ ...escalation, updatedAt: new Date() })
+      .where(eq(costEscalation.id, id))
+      .returning();
+    return result;
   }
 }
 

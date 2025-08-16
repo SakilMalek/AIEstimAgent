@@ -305,3 +305,193 @@ export type ProjectPricing = typeof projectPricing.$inferSelect;
 
 export type InsertEstimateTemplate = z.infer<typeof insertEstimateTemplateSchema>;
 export type EstimateTemplate = typeof estimateTemplates.$inferSelect;
+
+// Regional Cost Database Tables
+export const regionalCostDatabase = pgTable("regional_cost_database", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  region: text("region").notNull(), // e.g., "Northeast", "Southwest", "California Bay Area"
+  state: text("state"),
+  city: text("city"),
+  zipCode: text("zip_code"),
+  costIndex: real("cost_index").notNull().default(1.0), // Cost multiplier for region
+  laborRate: real("labor_rate"), // Average labor rate per hour
+  materialMarkup: real("material_markup").default(0.15), // Regional material markup percentage
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Supplier Management
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  website: text("website"),
+  specialties: jsonb("specialties"), // Array of trade specialties
+  leadTime: integer("lead_time_days").default(7), // Default lead time in days
+  paymentTerms: text("payment_terms").default("NET 30"),
+  discount: real("discount_percentage").default(0), // Volume discount percentage
+  rating: real("rating").default(0), // Supplier rating 1-5
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Real-time Material Pricing
+export const materialPricing = pgTable("material_pricing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  skuId: varchar("sku_id").references(() => productSkus.id).notNull(),
+  supplierId: varchar("supplier_id").references(() => suppliers.id).notNull(),
+  currentPrice: real("current_price").notNull(),
+  previousPrice: real("previous_price"),
+  priceChange: real("price_change"), // Percentage change from previous price
+  minimumOrderQuantity: integer("minimum_order_quantity").default(1),
+  volumeDiscounts: jsonb("volume_discounts"), // Tiered pricing structure
+  availability: text("availability").default("in_stock"), // in_stock, limited, backorder, discontinued
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  priceValidUntil: timestamp("price_valid_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Change Order Management
+export const changeOrders = pgTable("change_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id).notNull(),
+  changeOrderNumber: text("change_order_number").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  requestedBy: text("requested_by"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, completed
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  originalCost: real("original_cost").default(0),
+  proposedCost: real("proposed_cost").default(0),
+  approvedCost: real("approved_cost"),
+  actualCost: real("actual_cost"),
+  costImpact: real("cost_impact"), // Difference from original estimate
+  scheduleImpact: integer("schedule_impact_days").default(0),
+  impactedTakeoffs: jsonb("impacted_takeoffs"), // Array of takeoff IDs affected
+  attachments: jsonb("attachments"), // Document attachments
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Profit Margin and Markup Controls
+export const profitMarginSettings = pgTable("profit_margin_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id),
+  tradeClassId: varchar("trade_class_id").references(() => tradeClasses.id),
+  scope: text("scope").notNull().default("global"), // global, project, trade_class
+  materialMarkup: real("material_markup").default(0.15), // 15% default material markup
+  laborMarkup: real("labor_markup").default(0.25), // 25% default labor markup
+  equipmentMarkup: real("equipment_markup").default(0.20), // 20% default equipment markup
+  subcontractorMarkup: real("subcontractor_markup").default(0.10), // 10% default subcontractor markup
+  generalConditions: real("general_conditions").default(0.08), // 8% for overhead
+  bondInsurance: real("bond_insurance").default(0.02), // 2% for bonds/insurance
+  contingency: real("contingency").default(0.05), // 5% contingency
+  profit: real("profit").default(0.10), // 10% profit margin
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Historical Cost Tracking and Trending
+export const costHistory = pgTable("cost_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  skuId: varchar("sku_id").references(() => productSkus.id).notNull(),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  regionId: varchar("region_id").references(() => regionalCostDatabase.id),
+  price: real("price").notNull(),
+  laborRate: real("labor_rate"),
+  recordDate: timestamp("record_date").notNull().defaultNow(),
+  inflationRate: real("inflation_rate"), // Annual inflation rate at time of record
+  economicIndex: real("economic_index"), // Construction cost index value
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Cost Escalation and Inflation Adjustments
+export const costEscalation = pgTable("cost_escalation", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id).notNull(),
+  escalationType: text("escalation_type").notNull(), // annual_inflation, custom_rate, market_adjustment
+  rate: real("rate").notNull(), // Annual escalation rate as percentage
+  effectiveDate: timestamp("effective_date").notNull(),
+  endDate: timestamp("end_date"),
+  impactedCategories: jsonb("impacted_categories"), // Which cost categories are affected
+  reason: text("reason"), // Reason for escalation
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Add insert schemas for new tables
+export const insertRegionalCostDatabaseSchema = createInsertSchema(regionalCostDatabase).omit({
+  id: true,
+  lastUpdated: true,
+  createdAt: true,
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMaterialPricingSchema = createInsertSchema(materialPricing).omit({
+  id: true,
+  lastUpdated: true,
+  createdAt: true,
+});
+
+export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProfitMarginSettingsSchema = createInsertSchema(profitMarginSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCostHistorySchema = createInsertSchema(costHistory).omit({
+  id: true,
+  recordDate: true,
+  createdAt: true,
+});
+
+export const insertCostEscalationSchema = createInsertSchema(costEscalation).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Add new types
+export type InsertRegionalCostDatabase = z.infer<typeof insertRegionalCostDatabaseSchema>;
+export type RegionalCostDatabase = typeof regionalCostDatabase.$inferSelect;
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+export type InsertMaterialPricing = z.infer<typeof insertMaterialPricingSchema>;
+export type MaterialPricing = typeof materialPricing.$inferSelect;
+
+export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
+export type ChangeOrder = typeof changeOrders.$inferSelect;
+
+export type InsertProfitMarginSettings = z.infer<typeof insertProfitMarginSettingsSchema>;
+export type ProfitMarginSettings = typeof profitMarginSettings.$inferSelect;
+
+export type InsertCostHistory = z.infer<typeof insertCostHistorySchema>;
+export type CostHistory = typeof costHistory.$inferSelect;
+
+export type InsertCostEscalation = z.infer<typeof insertCostEscalationSchema>;
+export type CostEscalation = typeof costEscalation.$inferSelect;

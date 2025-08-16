@@ -9,6 +9,7 @@ import ProjectDetail from "@/pages/project-detail";
 
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
+import AdvancedCostManagement from "@/pages/advanced-cost-management";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
+      <Route path="/advanced-cost-management" component={AdvancedCostManagement} />
       <Route component={NotFound} />
     </Switch>
   );

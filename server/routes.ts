@@ -10,7 +10,14 @@ import {
   insertTradeClassSchema,
   insertProductSkuSchema,
   insertProjectPricingSchema,
-  insertEstimateTemplateSchema
+  insertEstimateTemplateSchema,
+  insertRegionalCostDatabaseSchema,
+  insertSupplierSchema,
+  insertMaterialPricingSchema,
+  insertChangeOrderSchema,
+  insertProfitMarginSettingsSchema,
+  insertCostHistorySchema,
+  insertCostEscalationSchema
 } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -737,6 +744,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.sendFile(filePath);
     } else {
       res.status(404).json({ message: "File not found" });
+    }
+  });
+
+  // Regional Cost Database routes
+  app.get("/api/regional-costs", async (req, res) => {
+    try {
+      const { region, state, zipCode } = req.query;
+      let regionalCosts;
+      
+      if (region || state || zipCode) {
+        regionalCosts = await storage.getRegionalCostDataByLocation(
+          region as string,
+          state as string, 
+          zipCode as string
+        );
+      } else {
+        regionalCosts = await storage.getRegionalCostData();
+      }
+      
+      res.json(regionalCosts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch regional cost data" });
+    }
+  });
+
+  app.post("/api/regional-costs", async (req, res) => {
+    try {
+      const validatedData = insertRegionalCostDatabaseSchema.parse(req.body);
+      const regionalCost = await storage.createRegionalCostData(validatedData);
+      res.status(201).json(regionalCost);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid regional cost data" });
+    }
+  });
+
+  // Supplier Management routes
+  app.get("/api/suppliers", async (req, res) => {
+    try {
+      const { specialty } = req.query;
+      let suppliers;
+      
+      if (specialty) {
+        suppliers = await storage.getSuppliersBySpecialty(specialty as string);
+      } else {
+        suppliers = await storage.getSuppliers();
+      }
+      
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const validatedData = insertSupplierSchema.parse(req.body);
+      const supplier = await storage.createSupplier(validatedData);
+      res.status(201).json(supplier);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid supplier data" });
+    }
+  });
+
+  // Material Pricing routes
+  app.get("/api/material-pricing", async (req, res) => {
+    try {
+      const { skuId, supplierId } = req.query;
+      let pricing;
+      
+      if (skuId) {
+        pricing = await storage.getMaterialPricingBySku(skuId as string);
+      } else if (supplierId) {
+        pricing = await storage.getMaterialPricingBySupplier(supplierId as string);
+      } else {
+        pricing = await storage.getMaterialPricing();
+      }
+      
+      res.json(pricing);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch material pricing" });
+    }
+  });
+
+  app.post("/api/material-pricing", async (req, res) => {
+    try {
+      const validatedData = insertMaterialPricingSchema.parse(req.body);
+      const pricing = await storage.createMaterialPricing(validatedData);
+      res.status(201).json(pricing);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid material pricing data" });
+    }
+  });
+
+  // Change Order routes
+  app.get("/api/change-orders", async (req, res) => {
+    try {
+      const { projectId } = req.query;
+      let changeOrders;
+      
+      if (projectId) {
+        changeOrders = await storage.getChangeOrdersByProject(projectId as string);
+      } else {
+        changeOrders = await storage.getChangeOrders();
+      }
+      
+      res.json(changeOrders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch change orders" });
+    }
+  });
+
+  app.post("/api/change-orders", async (req, res) => {
+    try {
+      const validatedData = insertChangeOrderSchema.parse(req.body);
+      const changeOrder = await storage.createChangeOrder(validatedData);
+      res.status(201).json(changeOrder);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid change order data" });
+    }
+  });
+
+  // Profit Margin Settings routes
+  app.get("/api/profit-margins", async (req, res) => {
+    try {
+      const { scope, scopeId } = req.query;
+      let settings;
+      
+      if (scope) {
+        settings = await storage.getProfitMarginSettingsByScope(scope as string, scopeId as string);
+      } else {
+        settings = await storage.getProfitMarginSettings();
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch profit margin settings" });
+    }
+  });
+
+  app.post("/api/profit-margins", async (req, res) => {
+    try {
+      const validatedData = insertProfitMarginSettingsSchema.parse(req.body);
+      const settings = await storage.createProfitMarginSettings(validatedData);
+      res.status(201).json(settings);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid profit margin settings" });
+    }
+  });
+
+  // Cost History routes
+  app.get("/api/cost-history", async (req, res) => {
+    try {
+      const { skuId, days } = req.query;
+      let history;
+      
+      if (skuId && days) {
+        history = await storage.getCostTrend(skuId as string, parseInt(days as string));
+      } else if (skuId) {
+        history = await storage.getCostHistoryBySku(skuId as string);
+      } else {
+        history = await storage.getCostHistory();
+      }
+      
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch cost history" });
+    }
+  });
+
+  app.post("/api/cost-history", async (req, res) => {
+    try {
+      const validatedData = insertCostHistorySchema.parse(req.body);
+      const history = await storage.createCostHistory(validatedData);
+      res.status(201).json(history);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid cost history data" });
+    }
+  });
+
+  // Cost Escalation routes
+  app.get("/api/cost-escalation", async (req, res) => {
+    try {
+      const { projectId, activeOnly } = req.query;
+      let escalation;
+      
+      if (projectId && activeOnly === 'true') {
+        escalation = await storage.getActiveCostEscalation(projectId as string);
+      } else if (projectId) {
+        escalation = await storage.getCostEscalationByProject(projectId as string);
+      } else {
+        escalation = await storage.getCostEscalation();
+      }
+      
+      res.json(escalation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch cost escalation" });
+    }
+  });
+
+  app.post("/api/cost-escalation", async (req, res) => {
+    try {
+      const validatedData = insertCostEscalationSchema.parse(req.body);
+      const escalation = await storage.createCostEscalation(validatedData);
+      res.status(201).json(escalation);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid cost escalation data" });
     }
   });
 

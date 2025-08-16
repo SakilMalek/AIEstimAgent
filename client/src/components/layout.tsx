@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Bell, User, Home, Folder, BarChart3, Settings } from "lucide-react";
+import { Bell, User, Home, Folder, BarChart3, Settings, DollarSign } from "lucide-react";
 import CalculatorRobotIcon from "@/components/calculator-robot-icon";
 
 interface LayoutProps {
@@ -75,6 +75,21 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Reports
+              </Button>
+            </Link>
+
+            <Link href="/advanced-cost-management">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={
+                  location === "/advanced-cost-management"
+                    ? "text-blueprint-700 bg-blueprint-50 hover:bg-blueprint-100"
+                    : "text-slate-600 hover:text-blueprint-700"
+                }
+              >
+                <DollarSign className="w-4 h-4 mr-2" />
+                Advanced Costs
               </Button>
             </Link>
           </div>
