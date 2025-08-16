@@ -462,10 +462,12 @@ export default function ProjectDetail() {
       {/* Main Content */}
       <div className="p-6">
         <Tabs defaultValue="takeoffs" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="takeoffs">Takeoffs</TabsTrigger>
             <TabsTrigger value="saved-analyses">Saved Analyses</TabsTrigger>
             <TabsTrigger value="drawings">Drawings</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing</TabsTrigger>
+            <TabsTrigger value="skus">SKUs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="takeoffs" className="space-y-4">
@@ -769,6 +771,83 @@ export default function ProjectDetail() {
                   ))}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-4">
+            <div className="bg-white rounded-lg border border-slate-200">
+              <div className="p-4 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Project Pricing</h3>
+                    <p className="text-sm text-slate-600">Manage custom pricing for this project</p>
+                  </div>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Custom Pricing
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="p-8 text-center">
+                <DollarSign className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-slate-900 mb-2">Custom Project Pricing</h4>
+                <p className="text-slate-600 mb-4">
+                  Override default SKU pricing for this specific project. Custom pricing will be used in all calculations and reports for this project.
+                </p>
+                <p className="text-sm text-slate-500">
+                  No custom pricing configured yet. This project uses default SKU pricing.
+                </p>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="skus" className="space-y-4">
+            <div className="bg-white rounded-lg border border-slate-200">
+              <div className="p-4 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Available SKUs</h3>
+                    <p className="text-sm text-slate-600">Browse and manage product catalog</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Import SKUs
+                    </Button>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add SKU
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-8 text-center">
+                <Calculator className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-slate-900 mb-2">Product SKU Catalog</h4>
+                <p className="text-slate-600 mb-4">
+                  Manage your product catalog with pricing, trade classes, and vendor information. SKUs are used throughout the system for accurate cost estimation.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto text-sm">
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900">General Construction</p>
+                    <p className="text-slate-500">24 SKUs</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900">Electrical</p>
+                    <p className="text-slate-500">18 SKUs</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900">Plumbing</p>
+                    <p className="text-slate-500">15 SKUs</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900">HVAC</p>
+                    <p className="text-slate-500">12 SKUs</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

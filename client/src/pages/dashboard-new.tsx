@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/layout";
 import DrawingViewer from "@/components/drawing-viewer";
 import InteractiveFloorPlan from "@/components/interactive-floor-plan";
@@ -13,11 +14,13 @@ import {
   Ruler,
   Square,
   Hash,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react";
 import type { Drawing, Project } from "@shared/schema";
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   const [selectedTakeoffTypes, setSelectedTakeoffTypes] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
@@ -295,6 +298,12 @@ export default function Dashboard() {
                   <Button className="bg-purple-600 hover:bg-purple-700 text-white" size="sm">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     AI Assistant
+                  </Button>
+                  
+                  {/* Quick Settings Access */}
+                  <Button variant="outline" size="sm" onClick={() => setLocation('/settings')}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Catalog
                   </Button>
                 </div>
               </div>

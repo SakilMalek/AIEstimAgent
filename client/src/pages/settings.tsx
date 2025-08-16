@@ -114,6 +114,35 @@ export default function Settings() {
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl">
           
+          {/* Catalog Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="w-5 h-5" />
+                Product Catalog
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Manage your product SKUs, trade classes, and pricing information.
+              </p>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="font-medium text-slate-900">Trade Classes</p>
+                  <p className="text-slate-500">8 classes configured</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="font-medium text-slate-900">Product SKUs</p>
+                  <p className="text-slate-500">156+ items available</p>
+                </div>
+              </div>
+              <div className="text-xs text-slate-500 bg-blue-50 p-3 rounded-lg">
+                <strong>Note:</strong> Catalog management is now integrated into individual projects. 
+                Access pricing and SKU management through the "Pricing" and "SKUs" tabs in any project detail page.
+              </div>
+            </CardContent>
+          </Card>
+          
           {/* Profile Settings */}
           <Card>
             <CardHeader>
