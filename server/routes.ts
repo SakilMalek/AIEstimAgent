@@ -247,6 +247,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch update takeoffs
+  app.patch("/api/takeoffs/batch", async (req, res) => {
+    try {
+      const { takeoffIds, updates } = req.body;
+      if (!Array.isArray(takeoffIds) || !updates) {
+        return res.status(400).json({ message: "Invalid batch update data" });
+      }
+
+      const results = [];
+      for (const takeoffId of takeoffIds) {
+        const takeoff = await storage.updateTakeoff(takeoffId, updates);
+        if (takeoff) {
+          results.push(takeoff);
+        }
+      }
+      
+      res.json({ updatedCount: results.length, takeoffs: results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to batch update takeoffs" });
+    }
+  });
+
   // Project-specific routes
   app.get("/api/projects/:id/drawings", async (req, res) => {
     try {

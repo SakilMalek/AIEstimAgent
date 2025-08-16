@@ -391,6 +391,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTakeoff(id: string, updateData: Partial<InsertTakeoff>): Promise<Takeoff | undefined> {
+    // Store original values if not already stored and this is the first manual edit
+    if (updateData.manuallyEdited && !updateData.originalQuantity) {
+      const existingTakeoff = await this.getTakeoff(id);
+      if (existingTakeoff && !existingTakeoff.manuallyEdited) {
+        updateData.originalQuantity = existingTakeoff.quantity;
+        updateData.originalArea = existingTakeoff.area;
+        updateData.originalLength = existingTakeoff.length;
+        updateData.originalCostPerUnit = existingTakeoff.costPerUnit;
+        updateData.originalTotalCost = existingTakeoff.totalCost;
+      }
+    }
+
     const [takeoff] = await db
       .update(takeoffs)
       .set({ ...updateData, updatedAt: new Date() })

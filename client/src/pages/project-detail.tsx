@@ -53,6 +53,10 @@ import {
   Save,
   Download,
   Plus,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  Copy,
   Eye,
   Calculator,
   FileText,
@@ -67,16 +71,26 @@ export default function ProjectDetail() {
   const projectId = params?.id;
   const [, setLocation] = useLocation();
   const [isEditingTakeoff, setIsEditingTakeoff] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{ quantity: number; costPerUnit: number; notes: string }>({
+  const [editValues, setEditValues] = useState<{ 
+    quantity: number; 
+    costPerUnit: number; 
+    notes: string; 
+    area: number | null; 
+    length: number | null; 
+  }>({
     quantity: 0,
     costPerUnit: 0,
-    notes: ""
+    notes: "",
+    area: null,
+    length: null
   });
   const [isSaveAnalysisOpen, setIsSaveAnalysisOpen] = useState(false);
   const [analysisName, setAnalysisName] = useState("");
   const [analysisDescription, setAnalysisDescription] = useState("");
   const [isDeleteAnalysisOpen, setIsDeleteAnalysisOpen] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<SavedAnalysis | null>(null);
+  const [selectedTakeoffs, setSelectedTakeoffs] = useState<Set<string>>(new Set());
+  const [batchEditMode, setBatchEditMode] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -174,7 +188,9 @@ export default function ProjectDetail() {
     setEditValues({
       quantity: takeoff.quantity || 0,
       costPerUnit: takeoff.costPerUnit || 0,
-      notes: takeoff.notes || ""
+      notes: takeoff.notes || "",
+      area: takeoff.area,
+      length: takeoff.length
     });
   };
 
@@ -185,9 +201,12 @@ export default function ProjectDetail() {
       data: {
         quantity: editValues.quantity,
         costPerUnit: editValues.costPerUnit,
+        area: editValues.area,
+        length: editValues.length,
         totalCost,
         notes: editValues.notes,
-        verified: true
+        verified: true,
+        manuallyEdited: true
       }
     });
   };
@@ -229,6 +248,77 @@ export default function ProjectDetail() {
     if (selectedAnalysis) {
       deleteAnalysisMutation.mutate(selectedAnalysis.id);
     }
+  };
+
+  // Batch operations
+  const toggleTakeoffSelection = (takeoffId: string) => {
+    const newSelected = new Set(selectedTakeoffs);
+    if (newSelected.has(takeoffId)) {
+      newSelected.delete(takeoffId);
+    } else {
+      newSelected.add(takeoffId);
+    }
+    setSelectedTakeoffs(newSelected);
+  };
+
+  const selectAllTakeoffs = () => {
+    setSelectedTakeoffs(new Set(takeoffs.map(t => t.id)));
+  };
+
+  const clearTakeoffSelection = () => {
+    setSelectedTakeoffs(new Set());
+  };
+
+  // Batch operations using the batch API endpoint
+  const batchUpdateMutation = useMutation({
+    mutationFn: ({ takeoffIds, updates }: { takeoffIds: string[]; updates: any }) =>
+      apiRequest("/api/takeoffs/batch", "PATCH", { takeoffIds, updates }),
+    onSuccess: () => {
+      toast({
+        title: "Batch update completed",
+        description: "Selected takeoffs have been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "takeoffs"] });
+      clearTakeoffSelection();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Batch update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const batchMarkAsVerified = () => {
+    batchUpdateMutation.mutate({
+      takeoffIds: Array.from(selectedTakeoffs),
+      updates: { verified: true }
+    });
+  };
+
+  const batchApplyPricing = (costPerUnit: number) => {
+    const updates: any = { 
+      costPerUnit,
+      manuallyEdited: true
+    };
+    
+    // Calculate totalCost for each takeoff individually would require individual updates
+    // For now, we'll use individual mutations to handle quantity-specific calculations
+    selectedTakeoffs.forEach(takeoffId => {
+      const takeoff = takeoffs.find(t => t.id === takeoffId);
+      if (takeoff) {
+        updateTakeoffMutation.mutate({
+          id: takeoffId,
+          data: { 
+            costPerUnit,
+            totalCost: (takeoff.quantity || 0) * costPerUnit,
+            manuallyEdited: true
+          }
+        });
+      }
+    });
+    clearTakeoffSelection();
   };
 
   const exportTakeoffs = () => {
@@ -473,8 +563,85 @@ export default function ProjectDetail() {
           <TabsContent value="takeoffs" className="space-y-4">
             <div className="bg-white rounded-lg border border-slate-200">
               <div className="p-4 border-b border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-900">Takeoff Items</h3>
-                <p className="text-sm text-slate-600">Review and edit extracted quantities and costs</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Takeoff Items</h3>
+                    <p className="text-sm text-slate-600">Review and edit extracted quantities and costs</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setBatchEditMode(!batchEditMode)}
+                      className={batchEditMode ? "bg-blue-50 border-blue-200" : ""}
+                    >
+                      {batchEditMode ? <CheckSquare className="w-4 h-4 mr-1" /> : <Square className="w-4 h-4 mr-1" />}
+                      Batch Mode
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Batch Operations Toolbar */}
+                {batchEditMode && (
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+                    <div className="flex items-center space-x-4 text-sm">
+                      <span className="text-slate-600">
+                        {selectedTakeoffs.size} of {takeoffs.length} selected
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={selectAllTakeoffs}
+                        disabled={selectedTakeoffs.size === takeoffs.length}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={clearTakeoffSelection}
+                        disabled={selectedTakeoffs.size === 0}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+
+                    {selectedTakeoffs.size > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          onClick={batchMarkAsVerified}
+                          disabled={updateTakeoffMutation.isPending}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Mark Verified
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              <DollarSign className="w-4 h-4 mr-1" />
+                              Apply Pricing
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => batchApplyPricing(10)}>
+                              $10.00 per unit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => batchApplyPricing(25)}>
+                              $25.00 per unit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => batchApplyPricing(50)}>
+                              $50.00 per unit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => batchApplyPricing(100)}>
+                              $100.00 per unit
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {takeoffsLoading ? (
@@ -519,21 +686,81 @@ export default function ProjectDetail() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Core Measurements */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
-                              <Label htmlFor={`quantity-${takeoff.id}`}>Quantity</Label>
+                              <Label htmlFor={`quantity-${takeoff.id}`}>
+                                Quantity
+                                {takeoff.originalQuantity && takeoff.originalQuantity !== editValues.quantity && (
+                                  <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.originalQuantity})</span>
+                                )}
+                              </Label>
                               <Input
                                 id={`quantity-${takeoff.id}`}
                                 type="number"
                                 value={editValues.quantity}
                                 onChange={(e) => setEditValues({
                                   ...editValues,
-                                  quantity: parseFloat(e.target.value) || 0
+                                  quantity: parseInt(e.target.value) || 0
                                 })}
+                                className={takeoff.originalQuantity && takeoff.originalQuantity !== editValues.quantity ? 
+                                  "border-yellow-300 bg-yellow-50" : ""}
                               />
                             </div>
+                            
+                            {takeoff.area !== null && (
+                              <div>
+                                <Label htmlFor={`area-${takeoff.id}`}>
+                                  Area (sq ft)
+                                  {takeoff.originalArea && takeoff.originalArea !== editValues.area && (
+                                    <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.originalArea})</span>
+                                  )}
+                                </Label>
+                                <Input
+                                  id={`area-${takeoff.id}`}
+                                  type="number"
+                                  step="0.1"
+                                  value={editValues.area || ''}
+                                  onChange={(e) => setEditValues({
+                                    ...editValues,
+                                    area: parseFloat(e.target.value) || null
+                                  })}
+                                  className={takeoff.originalArea && takeoff.originalArea !== editValues.area ? 
+                                    "border-yellow-300 bg-yellow-50" : ""}
+                                />
+                              </div>
+                            )}
+                            
+                            {takeoff.length !== null && (
+                              <div>
+                                <Label htmlFor={`length-${takeoff.id}`}>
+                                  Length (ft)
+                                  {takeoff.originalLength && takeoff.originalLength !== editValues.length && (
+                                    <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.originalLength})</span>
+                                  )}
+                                </Label>
+                                <Input
+                                  id={`length-${takeoff.id}`}
+                                  type="number"
+                                  step="0.1"
+                                  value={editValues.length || ''}
+                                  onChange={(e) => setEditValues({
+                                    ...editValues,
+                                    length: parseFloat(e.target.value) || null
+                                  })}
+                                  className={takeoff.originalLength && takeoff.originalLength !== editValues.length ? 
+                                    "border-yellow-300 bg-yellow-50" : ""}
+                                />
+                              </div>
+                            )}
+                            
                             <div>
-                              <Label htmlFor={`cost-${takeoff.id}`}>Cost Per Unit ($)</Label>
+                              <Label htmlFor={`cost-${takeoff.id}`}>
+                                Cost Per Unit ($)
+                                {takeoff.originalCostPerUnit && takeoff.originalCostPerUnit !== editValues.costPerUnit && (
+                                  <span className="text-xs text-slate-500 ml-1">(Original: ${takeoff.originalCostPerUnit})</span>
+                                )}
+                              </Label>
                               <Input
                                 id={`cost-${takeoff.id}`}
                                 type="number"
@@ -543,13 +770,39 @@ export default function ProjectDetail() {
                                   ...editValues,
                                   costPerUnit: parseFloat(e.target.value) || 0
                                 })}
+                                className={takeoff.originalCostPerUnit && takeoff.originalCostPerUnit !== editValues.costPerUnit ? 
+                                  "border-yellow-300 bg-yellow-50" : ""}
                               />
                             </div>
+                          </div>
+
+                          {/* Calculated Values */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-slate-50 rounded-lg">
                             <div>
-                              <Label>Total Cost</Label>
-                              <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm">
+                              <Label className="text-xs text-slate-600">Unit</Label>
+                              <p className="font-medium">{takeoff.unit}</p>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-slate-600">Calculated Total Cost</Label>
+                              <p className="font-medium text-lg text-slate-900">
                                 ${(editValues.quantity * editValues.costPerUnit).toLocaleString()}
-                              </div>
+                              </p>
+                            </div>
+                            <div className="flex items-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  if (takeoff.originalQuantity) setEditValues({...editValues, quantity: takeoff.originalQuantity});
+                                  if (takeoff.originalArea) setEditValues({...editValues, area: takeoff.originalArea});
+                                  if (takeoff.originalLength) setEditValues({...editValues, length: takeoff.originalLength});
+                                  if (takeoff.originalCostPerUnit) setEditValues({...editValues, costPerUnit: takeoff.originalCostPerUnit});
+                                }}
+                                disabled={!takeoff.originalQuantity && !takeoff.originalCostPerUnit}
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                Reset to AI
+                              </Button>
                             </div>
                           </div>
                           
@@ -569,6 +822,16 @@ export default function ProjectDetail() {
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
+                          {batchEditMode && (
+                            <div className="mr-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedTakeoffs.has(takeoff.id)}
+                                onChange={() => toggleTakeoffSelection(takeoff.id)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-medium text-slate-900">{takeoff.elementName}</h4>
@@ -579,7 +842,13 @@ export default function ProjectDetail() {
                                     Verified
                                   </Badge>
                                 )}
-                                {takeoff.detectedByAi && (
+                                {takeoff.manuallyEdited && (
+                                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                    <Edit className="w-3 h-3 mr-1" />
+                                    Modified
+                                  </Badge>
+                                )}
+                                {takeoff.detectedByAi && !takeoff.manuallyEdited && (
                                   <Badge variant="outline" className="text-blue-600 border-blue-200">
                                     AI Detected
                                   </Badge>
@@ -587,24 +856,86 @@ export default function ProjectDetail() {
                               </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
                               <div>
                                 <p className="text-slate-500">Type</p>
                                 <p className="font-medium">{takeoff.elementType}</p>
                               </div>
                               <div>
-                                <p className="text-slate-500">Quantity</p>
+                                <p className="text-slate-500">
+                                  Quantity
+                                  {takeoff.originalQuantity && takeoff.originalQuantity !== takeoff.quantity && (
+                                    <span className="text-xs text-yellow-600 ml-1">(was {takeoff.originalQuantity})</span>
+                                  )}
+                                </p>
                                 <p className="font-medium">{takeoff.quantity} {takeoff.unit}</p>
                               </div>
+                              {takeoff.area && (
+                                <div>
+                                  <p className="text-slate-500">
+                                    Area
+                                    {takeoff.originalArea && takeoff.originalArea !== takeoff.area && (
+                                      <span className="text-xs text-yellow-600 ml-1">(was {takeoff.originalArea})</span>
+                                    )}
+                                  </p>
+                                  <p className="font-medium">{takeoff.area} sq ft</p>
+                                </div>
+                              )}
                               <div>
-                                <p className="text-slate-500">Cost/Unit</p>
+                                <p className="text-slate-500">
+                                  Cost/Unit
+                                  {takeoff.originalCostPerUnit && takeoff.originalCostPerUnit !== takeoff.costPerUnit && (
+                                    <span className="text-xs text-yellow-600 ml-1">(was ${takeoff.originalCostPerUnit})</span>
+                                  )}
+                                </p>
                                 <p className="font-medium">${takeoff.costPerUnit?.toLocaleString() || "0"}</p>
                               </div>
                               <div>
                                 <p className="text-slate-500">Total Cost</p>
                                 <p className="font-medium text-slate-900">${takeoff.totalCost?.toLocaleString() || "0"}</p>
                               </div>
-                              <div className="flex items-center justify-end">
+                              <div className="flex items-center justify-end space-x-2">
+                                <div className="flex items-center space-x-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const newQuantity = (takeoff.quantity || 0) - 1;
+                                      if (newQuantity >= 0) {
+                                        updateTakeoffMutation.mutate({
+                                          id: takeoff.id,
+                                          data: { 
+                                            quantity: newQuantity,
+                                            totalCost: newQuantity * (takeoff.costPerUnit || 0),
+                                            manuallyEdited: true
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    className="w-6 h-6 p-0"
+                                    disabled={!takeoff.quantity || takeoff.quantity <= 0}
+                                  >
+                                    -
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const newQuantity = (takeoff.quantity || 0) + 1;
+                                      updateTakeoffMutation.mutate({
+                                        id: takeoff.id,
+                                        data: { 
+                                          quantity: newQuantity,
+                                          totalCost: newQuantity * (takeoff.costPerUnit || 0),
+                                          manuallyEdited: true
+                                        }
+                                      });
+                                    }}
+                                    className="w-6 h-6 p-0"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                                 <Button
                                   size="sm"
                                   variant="outline"

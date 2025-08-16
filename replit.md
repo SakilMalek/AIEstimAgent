@@ -126,6 +126,11 @@ Preferred communication style: Simple, everyday language.
 - **Comprehensive Catalog System**: Built complete trade classes, product SKUs, project pricing, and estimate templates database schema with full CRUD operations
 - **Sample Catalog Data**: Auto-initialized 8 trade classes (General Construction, Electrical, Plumbing, HVAC, Flooring, Windows & Doors, Roofing, Insulation) and 16 product SKUs with realistic pricing
 - **Workflow Integration**: Pricing and catalog management now accessible within project context instead of separate application
+- **Granular Takeoff Editing**: Enhanced manual control for quantities, costs, measurements (area/length) with visual indicators for AI vs manual values
+- **Batch Operations**: Added batch selection and editing capabilities for multiple takeoffs with efficient API endpoints
+- **Manual Override Tracking**: System tracks original AI values vs manual edits, allowing users to reset to AI suggestions or see change history
+- **Quick Quantity Adjustments**: Added +/- buttons for rapid quantity changes directly in takeoff list view
+- **Enhanced Visual Feedback**: Color-coded fields and badges show modified values, verified status, and AI detection indicators
 
 ### Current Limitations
 - Local file storage (not suitable for distributed deployment)

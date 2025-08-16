@@ -38,15 +38,23 @@ export const takeoffs = pgTable("takeoffs", {
   elementName: text("element_name").notNull(),
   itemType: text("item_type").notNull(), // display name for UI
   quantity: integer("quantity").default(0),
+  originalQuantity: integer("original_quantity"), // AI-detected quantity before manual edits
   area: real("area"), // for area measurements
+  originalArea: real("original_area"), // Original AI-detected area
   length: real("length"), // for linear measurements
+  originalLength: real("original_length"), // Original AI-detected length
   width: real("width"),
   height: real("height"),
   unit: text("unit").notNull(), // sq ft, ft, count, etc.
   coordinates: jsonb("coordinates"), // x, y coordinates for annotations
   detectedByAi: boolean("detected_by_ai").default(false),
   costPerUnit: real("cost_per_unit"),
+  originalCostPerUnit: real("original_cost_per_unit"), // Original cost before manual adjustments
   totalCost: real("total_cost"),
+  originalTotalCost: real("original_total_cost"), // Original total cost before adjustments
+  manuallyEdited: boolean("manually_edited").default(false), // Track if user has modified this item
+  customPricing: jsonb("custom_pricing"), // Store custom pricing overrides
+  linkedSkuId: varchar("linked_sku_id").references(() => productSkus.id), // Link to product SKU for pricing
   notes: text("notes"), // user notes for the takeoff item
   verified: boolean("verified").default(false), // manually verified by user
   createdAt: timestamp("created_at").defaultNow(),
