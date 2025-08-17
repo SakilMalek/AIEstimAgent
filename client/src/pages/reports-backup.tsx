@@ -244,196 +244,191 @@ export default function Reports() {
 
             {/* AI Analysis Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Project Efficiency Distribution */}
-              <Card data-testid="card-efficiency-distribution">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Target className="w-5 h-5 mr-2 text-blue-600" />
-                    AI Efficiency Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {Object.entries(efficiencyDistribution).map(([level, count]) => {
-                      const percentage = projects.length > 0 ? (count / projects.length) * 100 : 0;
-                      const colors = {
-                        excellent: 'bg-green-500',
-                        good: 'bg-blue-500', 
-                        average: 'bg-yellow-500',
-                        poor: 'bg-red-500'
-                      };
-                      
-                      return (
-                        <div key={level} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-3 h-3 rounded-full ${colors[level as keyof typeof colors]}`} />
-                            <span className="text-sm font-medium text-slate-700 capitalize">{level}</span>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-20 h-2 bg-slate-200 rounded">
-                              <div 
-                                className={`h-2 rounded ${colors[level as keyof typeof colors]}`}
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-slate-900 w-12 text-right">
-                              {count}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Total Projects</p>
+                  <p className="text-2xl font-bold text-slate-900">{reportData.totalProjects}</p>
+                </div>
+                <div className="w-8 h-8 bg-blueprint-100 rounded-lg flex items-center justify-center">
+                  <Building className="w-4 h-4 text-blueprint-600" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4">
+                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <span className="text-sm text-green-600">+12% from last month</span>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Risk Assessment Distribution */}
-              <Card data-testid="card-risk-distribution">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="w-5 h-5 mr-2 text-red-600" />
-                    AI Risk Assessment
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {Object.entries(riskDistribution).map(([level, count]) => {
-                      const percentage = projects.length > 0 ? (count / projects.length) * 100 : 0;
-                      const colors = {
-                        low: 'bg-green-500',
-                        medium: 'bg-yellow-500',
-                        high: 'bg-orange-500',
-                        critical: 'bg-red-500'
-                      };
-                      
-                      return (
-                        <div key={level} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-3 h-3 rounded-full ${colors[level as keyof typeof colors]}`} />
-                            <span className="text-sm font-medium text-slate-700 capitalize">{level} Risk</span>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-20 h-2 bg-slate-200 rounded">
-                              <div 
-                                className={`h-2 rounded ${colors[level as keyof typeof colors]}`}
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-slate-900 w-12 text-right">
-                              {count}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Completed Takeoffs</p>
+                  <p className="text-2xl font-bold text-slate-900">{reportData.completedTakeoffs}</p>
+                </div>
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-4 h-4 text-green-600" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4">
+                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <span className="text-sm text-green-600">+8% accuracy improvement</span>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Project Analysis Table */}
-            <Card data-testid="card-project-analysis-table">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center">
-                    <BarChart3 className="w-5 h-5 mr-2 text-slate-600" />
-                    Project Performance Analysis
-                  </span>
-                  <Button variant="outline" size="sm" data-testid="button-export-analysis">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Analysis
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {analysisData.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">Project</th>
-                            <th className="text-left py-2">Total Cost</th>
-                            <th className="text-left py-2">Efficiency</th>
-                            <th className="text-left py-2">Risk Level</th>
-                            <th className="text-left py-2">Trend</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {analysisData.map((item, index) => (
-                            <tr key={index} className="border-b hover:bg-slate-50">
-                              <td className="py-3">
-                                <div>
-                                  <p className="font-medium text-slate-900">{item?.project.name}</p>
-                                  <p className="text-xs text-slate-500">{item?.project.client}</p>
-                                </div>
-                              </td>
-                              <td className="py-3">
-                                <span className="font-medium">
-                                  ${(item?.costAnalysis?.totalCost || 0).toLocaleString()}
-                                </span>
-                              </td>
-                              <td className="py-3">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-sm font-medium">
-                                    {item?.costAnalysis?.overallScore || 0}/100
-                                  </span>
-                                  <Badge 
-                                    variant={
-                                      item?.costAnalysis?.efficiency === 'excellent' ? 'default' :
-                                      item?.costAnalysis?.efficiency === 'good' ? 'secondary' : 'outline'
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {item?.costAnalysis?.efficiency}
-                                  </Badge>
-                                </div>
-                              </td>
-                              <td className="py-3">
-                                <Badge 
-                                  variant={
-                                    item?.riskAssessment?.riskLevel === 'low' ? 'default' :
-                                    item?.riskAssessment?.riskLevel === 'medium' ? 'secondary' :
-                                    item?.riskAssessment?.riskLevel === 'high' ? 'destructive' : 'destructive'
-                                  }
-                                  className="text-xs capitalize"
-                                >
-                                  {item?.riskAssessment?.riskLevel}
-                                </Badge>
-                              </td>
-                              <td className="py-3">
-                                <div className="flex items-center space-x-1">
-                                  {item?.costTrends?.trendDirection === 'increasing' ? (
-                                    <TrendingUp className="w-4 h-4 text-red-500" />
-                                  ) : item?.costTrends?.trendDirection === 'decreasing' ? (
-                                    <TrendingDown className="w-4 h-4 text-green-500" />
-                                  ) : (
-                                    <div className="w-4 h-4" />
-                                  )}
-                                  <span className="text-xs text-slate-500 capitalize">
-                                    {item?.costTrends?.trendDirection || 'stable'}
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Total Estimated Value</p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    ${reportData.totalEstimatedValue.toLocaleString()}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4">
+                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <span className="text-sm text-green-600">+23% from last quarter</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Avg Project Value</p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    ${Math.round(reportData.avgProjectValue).toLocaleString()}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <PieChart className="w-4 h-4 text-purple-600" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4">
+                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <span className="text-sm text-green-600">+5% from last period</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Monthly Trend Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="w-5 h-5 text-blueprint-600 mr-2" />
+                Monthly Estimating Volume
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {reportData.monthlyTrend.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-600">{item.month}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-24 bg-slate-200 rounded-full h-2">
+                        <div 
+                          className="bg-blueprint-600 h-2 rounded-full" 
+                          style={{ width: `${(item.value / 700000) * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900 w-16 text-right">
+                        ${Math.round(item.value / 1000)}K
+                      </span>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <BarChart3 className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">No analysis data available</h3>
-                    <p className="text-slate-600 mb-4">
-                      Create projects with takeoff data to see AI-powered cost analysis and insights.
-                    </p>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Category Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <PieChart className="w-5 h-5 text-blueprint-600 mr-2" />
+                Project Categories
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {reportData.categoryBreakdown.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-slate-900">{category.category}</p>
+                      <p className="text-sm text-slate-600">{category.count} projects</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-slate-900">
+                        ${category.value.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {Math.round((category.value / reportData.totalEstimatedValue) * 100)}%
+                      </p>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Reports */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="w-5 h-5 text-blueprint-600 mr-2" />
+                Recent Reports
+              </div>
+              <Button variant="outline" size="sm">
+                View All
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {reportData.recentReports.map((report) => (
+                <div key={report.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-blueprint-100 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-blueprint-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{report.name}</p>
+                      <div className="flex items-center space-x-3 mt-1">
+                        <span className="text-sm text-slate-600">{report.date}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {report.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <p className="font-bold text-slate-900">
+                        ${report.value.toLocaleString()}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
