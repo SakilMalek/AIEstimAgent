@@ -97,6 +97,7 @@ Preferred communication style: Simple, everyday language.
 - File storage currently local (scalability consideration)
 
 ### Recent Changes (August 2025)
+- **Custom Logo Integration (August 26, 2025)**: Updated application branding with custom EstimAgent calculator-style logo, replaced generic icon with professional calculator design that reflects the application's estimation focus
 - **Database Integration**: Successfully migrated from in-memory storage to PostgreSQL with Drizzle ORM
 - **Navigation System**: Implemented functional navigation between Dashboard, Projects, and Reports pages
 - **Project Detail Pages**: Added individual project view/edit functionality with comprehensive project management

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Bell, User, Home, Folder, BarChart3, Settings, DollarSign } from "lucide-react";
-import CalculatorRobotIcon from "@/components/calculator-robot-icon";
+import estimagentLogo from "@/assets/estimagent-logo.png";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,9 +19,11 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center">
             <Link href="/">
               <div className="flex items-center space-x-3 cursor-pointer">
-                <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center shadow-lg">
-                  <CalculatorRobotIcon className="text-white" size={20} />
-                </div>
+                <img 
+                  src={estimagentLogo} 
+                  alt="EstimAgent Logo" 
+                  className="w-10 h-10 object-contain"
+                />
                 <span
                   className="text-xl font-bold font-family-Roboto text-slate-900"
                   style={{ fontFamily: "Roboto, sans-serif" }}
