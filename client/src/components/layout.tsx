@@ -21,7 +21,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex items-center cursor-pointer">
                 <img 
                   src={estimagentLogo} 
-                  alt="EstimAgent Calculator Logo" 
+                  alt="Calculator Logo" 
                   className="h-20 w-20 object-contain"
                 />
               </div>
