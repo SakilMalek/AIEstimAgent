@@ -34,7 +34,14 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const upload = multer({
-  dest: uploadDir,
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, cb) => {
+      const uniqueId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const ext = path.extname(file.originalname) || '.jpg'; // Default to .jpg if no extension
+      cb(null, uniqueId + ext);
+    }
+  }),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
@@ -49,8 +56,17 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve uploaded files
-  app.use('/uploads', express.static(uploadDir));
+  // Serve uploaded files with proper headers
+  app.use('/uploads', express.static(uploadDir, {
+    setHeaders: (res, path) => {
+      // Set proper content type based on file content
+      if (path.includes('pdf')) {
+        res.setHeader('Content-Type', 'application/pdf');
+      } else {
+        res.setHeader('Content-Type', 'image/jpeg'); // Default for images
+      }
+    }
+  }));
   
   // General file upload endpoint
   app.post("/api/upload", upload.single('file'), async (req: MulterRequest, res) => {
@@ -737,15 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files
-  app.use("/uploads", (req, res, next) => {
-    const filePath = path.join(uploadDir, req.path);
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ message: "File not found" });
-    }
-  });
+
 
   // Regional Cost Database routes
   app.get("/api/regional-costs", async (req, res) => {
