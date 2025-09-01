@@ -59,6 +59,7 @@ export default function DrawingViewer({ drawing, onFileUpload }: DrawingViewerPr
 
   const isProcessing = drawing.status === "processing";
   const isComplete = drawing.status === "complete" && drawing.aiProcessed;
+  const isPdf = drawing.fileUrl?.toLowerCase().endsWith('.pdf');
 
   return (
     <div className="flex-1 bg-slate-100 relative overflow-hidden">
@@ -122,18 +123,29 @@ export default function DrawingViewer({ drawing, onFileUpload }: DrawingViewerPr
             transition: isDragging ? 'none' : 'transform 0.3s ease',
           }}
         >
-          {/* Actual Blueprint Image */}
-          <img
-            src={drawing.fileUrl}
-            alt={drawing.name}
-            className="max-w-[800px] max-h-[600px] object-contain"
-            draggable={false}
-            onError={(e) => {
-              console.error('Failed to load drawing:', drawing.fileUrl);
-              // Fallback to a placeholder if image fails to load
-              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f8f9fa'/%3E%3Ctext x='200' y='150' text-anchor='middle' fill='%23666' font-family='Arial' font-size='16'%3EImage not found%3C/text%3E%3C/svg%3E";
-            }}
-          />
+          {/* Actual Blueprint Display */}
+          {isPdf ? (
+            <iframe
+              src={drawing.fileUrl}
+              title={drawing.name}
+              className="w-[800px] h-[600px] border-0"
+              onError={() => {
+                console.error('Failed to load PDF:', drawing.fileUrl);
+              }}
+            />
+          ) : (
+            <img
+              src={drawing.fileUrl}
+              alt={drawing.name}
+              className="max-w-[800px] max-h-[600px] object-contain"
+              draggable={false}
+              onError={(e) => {
+                console.error('Failed to load drawing:', drawing.fileUrl);
+                // Fallback to a placeholder if image fails to load
+                (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f8f9fa'/%3E%3Ctext x='200' y='150' text-anchor='middle' fill='%23666' font-family='Arial' font-size='16'%3EImage not found%3C/text%3E%3C/svg%3E";
+              }}
+            />
+          )}
           
           {/* AI Detection Overlays */}
           {isComplete && (
