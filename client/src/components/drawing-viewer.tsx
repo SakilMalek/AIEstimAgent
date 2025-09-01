@@ -122,12 +122,17 @@ export default function DrawingViewer({ drawing, onFileUpload }: DrawingViewerPr
             transition: isDragging ? 'none' : 'transform 0.3s ease',
           }}
         >
-          {/* Mock Blueprint Image */}
+          {/* Actual Blueprint Image */}
           <img
-            src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=800"
+            src={drawing.fileUrl}
             alt={drawing.name}
             className="max-w-[800px] max-h-[600px] object-contain"
             draggable={false}
+            onError={(e) => {
+              console.error('Failed to load drawing:', drawing.fileUrl);
+              // Fallback to a placeholder if image fails to load
+              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f8f9fa'/%3E%3Ctext x='200' y='150' text-anchor='middle' fill='%23666' font-family='Arial' font-size='16'%3EImage not found%3C/text%3E%3C/svg%3E";
+            }}
           />
           
           {/* AI Detection Overlays */}

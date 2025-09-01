@@ -97,6 +97,7 @@ Preferred communication style: Simple, everyday language.
 - File storage currently local (scalability consideration)
 
 ### Recent Changes (August 2025)
+- **Fixed Drawing Viewer Display (September 1, 2025)**: Corrected drawing viewer to show actual uploaded floor plans instead of placeholder images, enabling users to view their uploaded blueprints properly
 - **Custom Logo Integration (August 26, 2025)**: Updated application branding with custom EstimAgent calculator-style logo, replaced generic icon with professional calculator design that reflects the application's estimation focus
 - **Database Integration**: Successfully migrated from in-memory storage to PostgreSQL with Drizzle ORM
 - **Navigation System**: Implemented functional navigation between Dashboard, Projects, and Reports pages
