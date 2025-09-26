@@ -1,0 +1,6 @@
+# ml/requirements.txt
+fastapi
+uvicorn[standard]
+python-dotenv
+inference-sdk
+python-multipart

@@ -13,7 +13,7 @@ import type { Drawing } from "@shared/schema";
 
 interface DrawingViewerProps {
   drawing: Drawing | null;
-  onFileUpload?: (drawing: Drawing) => void;
+  onFileUpload?: (file: File) => void;
 }
 
 export default function DrawingViewer({ drawing, onFileUpload }: DrawingViewerProps) {

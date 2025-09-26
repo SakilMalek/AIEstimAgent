@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EstimAgent - AI-Powered Construction Takeoff Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'blueprint': {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 font-inter">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between px-6 py-4">
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-blueprint-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-ruler-combined text-white text-sm"></i>
+                    </div>
+                    <span class="text-xl font-bold text-slate-900">EstimAgent</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-1 ml-8">
+                    <button class="px-4 py-2 text-sm font-medium text-blueprint-700 bg-blueprint-50 rounded-lg hover:bg-blueprint-100 transition-colors">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </button>
+                    <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blueprint-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        <i class="fas fa-folder mr-2"></i>Projects
+                    </button>
+                    <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blueprint-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        <i class="fas fa-chart-bar mr-2"></i>Reports
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button class="relative p-2 text-slate-600 hover:text-blueprint-700 transition-colors">
+                    <i class="fas fa-bell"></i>
+                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                </button>
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-slate-600 text-sm"></i>
+                    </div>
+                    <span class="text-sm font-medium text-slate-700" data-bind="user.name">John Constructor</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col">
+            <!-- Project Selector -->
+            <div class="p-6 border-b border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-slate-900">Current Project</h2>
+                    <button class="p-2 text-slate-400 hover:text-blueprint-600 transition-colors">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-4">
+                    <h3 class="font-medium text-slate-900" data-bind="project.name">Downtown Office Complex</h3>
+                    <p class="text-sm text-slate-600 mt-1" data-bind="project.address">123 Business Ave, Suite 400</p>
+                    <div class="flex items-center mt-3 space-x-4">
+                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Active</span>
+                        <span class="text-xs text-slate-500" data-bind="project.lastModified">Updated 2h ago</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="p-6 border-b border-slate-200">
+                <h3 class="text-sm font-semibold text-slate-900 mb-4">Upload Drawings</h3>
+                <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-blueprint-400 transition-colors cursor-pointer" data-implementation="Implement file upload with drag and drop">
+                    <i class="fas fa-cloud-upload-alt text-3xl text-slate-400 mb-3"></i>
+                    <p class="text-sm font-medium text-slate-600 mb-1">Drop files here or click to browse</p>
+                    <p class="text-xs text-slate-500">PDF, PNG, JPG up to 50MB</p>
+                </div>
+                <button class="w-full mt-3 bg-blueprint-600 text-white py-2 px-4 rounded-lg hover:bg-blueprint-700 transition-colors text-sm font-medium">
+                    <i class="fas fa-plus mr-2"></i>Add New Drawing
+                </button>
+            </div>
+
+            <!-- Drawing List -->
+            <div class="p-6 flex-1 overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-slate-900">Project Drawings</h3>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full" data-bind="drawings.count">8 files</span>
+                </div>
+                
+                <!-- Drawing Items -->
+                <!-- @MAP: drawings.map(drawing => ( -->
+                <div class="space-y-3">
+                    <div class="bg-blueprint-50 border border-blueprint-200 rounded-lg p-3 cursor-pointer hover:bg-blueprint-100 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-image text-blueprint-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-slate-900" data-bind="drawing.name">Floor Plan - Level 1</p>
+                                    <p class="text-xs text-slate-500" data-bind="drawing.status">AI Processing Complete</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                <i class="fas fa-chevron-right text-slate-400 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-pdf text-slate-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-slate-900">Electrical Plan - Level 1</p>
+                                    <p class="text-xs text-slate-500">Ready for Review</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                <i class="fas fa-chevron-right text-slate-400 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-image text-slate-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-slate-900">HVAC Layout - Level 1</p>
+                                    <p class="text-xs text-amber-600">Processing...</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                                <i class="fas fa-spinner fa-spin text-amber-500 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-image text-slate-600"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-slate-900">Plumbing Layout</p>
+                                    <p class="text-xs text-slate-500">Pending Analysis</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <span class="w-2 h-2 bg-slate-400 rounded-full"></span>
+                                <i class="fas fa-chevron-right text-slate-400 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-slate-200 p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-semibold text-slate-900">Floor Plan - Level 1</h1>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-slate-500">Scale:</span>
+                            <select class="text-sm border border-slate-300 rounded px-2 py-1">
+                                <option>1/4" = 1'</option>
+                                <option>1/8" = 1'</option>
+                                <option>1/2" = 1'</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3">
+                        <!-- View Controls -->
+                        <div class="flex items-center bg-slate-100 rounded-lg p-1">
+                            <button class="px-3 py-1 text-sm font-medium bg-white text-slate-900 rounded shadow-sm">
+                                <i class="fas fa-eye mr-1"></i>View
+                            </button>
+                            <button class="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-900">
+                                <i class="fas fa-edit mr-1"></i>Annotate
+                            </button>
+                        </div>
+                        
+                        <!-- Measurement Tools -->
+                        <div class="flex items-center space-x-1 border-l border-slate-300 pl-3">
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors" title="Linear measurement">
+                                <i class="fas fa-ruler"></i>
+                            </button>
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors" title="Area measurement">
+                                <i class="fas fa-vector-square"></i>
+                            </button>
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors" title="Count items">
+                                <i class="fas fa-list-ol"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Zoom Controls -->
+                        <div class="flex items-center space-x-1 border-l border-slate-300 pl-3">
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <span class="text-sm text-slate-600 px-2">100%</span>
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="p-2 text-slate-600 hover:text-blueprint-600 hover:bg-blueprint-50 rounded transition-colors">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+
+                        <!-- Export -->
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                            <i class="fas fa-download mr-2"></i>Export Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Drawing Viewer -->
+                <div class="flex-1 bg-slate-100 relative overflow-hidden">
+                    <!-- Blueprint Image Container -->
+                    <div class="w-full h-full flex items-center justify-center p-8" data-implementation="Implement drawing viewer with zoom/pan capabilities">
+                        <!-- Construction blueprint showing floor plan with AI annotations -->
+                        <img src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1200&h=800" 
+                             alt="Construction blueprint floor plan" 
+                             class="max-w-full max-h-full object-contain shadow-lg rounded-lg bg-white" 
+                             data-mock-image="true" />
+                        
+                        <!-- AI Detection Overlays -->
+                        <div class="absolute inset-0 pointer-events-none" data-implementation="Add AI detection annotations and overlays">
+                            <!-- Door Detection Markers -->
+                            <div class="absolute top-1/3 left-1/4 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg animate-pulse"></div>
+                            <div class="absolute top-1/2 left-1/3 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg animate-pulse"></div>
+                            
+                            <!-- Window Detection Markers -->
+                            <div class="absolute top-1/4 right-1/3 w-4 h-4 bg-green-500 border-2 border-white rounded-full shadow-lg animate-pulse"></div>
+                            <div class="absolute bottom-1/3 right-1/4 w-4 h-4 bg-green-500 border-2 border-white rounded-full shadow-lg animate-pulse"></div>
+                            
+                            <!-- Area Highlights -->
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-24 border-2 border-amber-400 bg-amber-100 bg-opacity-30 rounded pointer-events-auto cursor-pointer">
+                                <div class="absolute -top-6 left-0 bg-amber-500 text-white text-xs px-2 py-1 rounded">Living Room: 245 sq ft</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Processing Indicator -->
+                    <!-- @STATE: isProcessing:boolean = false -->
+                    <div class="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 border border-slate-200">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                            <span class="text-sm font-medium text-slate-700">AI Analysis Complete</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Detected: 8 doors, 12 windows, 6 rooms</p>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Takeoff Results -->
+                <div class="w-96 bg-white border-l border-slate-200 flex flex-col">
+                    <!-- Panel Header -->
+                    <div class="p-4 border-b border-slate-200">
+                        <h2 class="text-lg font-semibold text-slate-900">Takeoff Results</h2>
+                        <p class="text-sm text-slate-600">AI-powered measurements and manual adjustments</p>
+                    </div>
+
+                    <!-- Results Content -->
+                    <div class="flex-1 overflow-y-auto">
+                        <!-- Summary Cards -->
+                        <div class="p-4 space-y-3">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-blue-900">Total Doors</h3>
+                                    <span class="text-lg font-bold text-blue-700" data-bind="takeoff.doors.count">8</span>
+                                </div>
+                                <p class="text-xs text-blue-600 mt-1">AI Detected + Manual Count</p>
+                            </div>
+                            
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-green-900">Total Windows</h3>
+                                    <span class="text-lg font-bold text-green-700" data-bind="takeoff.windows.count">12</span>
+                                </div>
+                                <p class="text-xs text-green-600 mt-1">Standard & Custom Sizes</p>
+                            </div>
+                            
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-amber-900">Floor Area</h3>
+                                    <span class="text-lg font-bold text-amber-700" data-bind="takeoff.floorArea">2,847 sq ft</span>
+                                </div>
+                                <p class="text-xs text-amber-600 mt-1">Measured Areas Combined</p>
+                            </div>
+                            
+                            <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-purple-900">Wall Length</h3>
+                                    <span class="text-lg font-bold text-purple-700" data-bind="takeoff.wallLength">428 ft</span>
+                                </div>
+                                <p class="text-xs text-purple-600 mt-1">Interior + Exterior</p>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Breakdown -->
+                        <div class="p-4 border-t border-slate-200">
+                            <h3 class="text-sm font-semibold text-slate-900 mb-3">Detailed Breakdown</h3>
+                            
+                            <!-- Doors Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-medium text-slate-700 flex items-center">
+                                        <i class="fas fa-door-open text-blue-600 mr-2"></i>Doors
+                                    </h4>
+                                    <button class="text-xs text-blueprint-600 hover:text-blueprint-700">Edit</button>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Interior Doors (36")</span>
+                                        <span class="font-medium" data-bind="doors.interior36">5</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Interior Doors (32")</span>
+                                        <span class="font-medium" data-bind="doors.interior32">2</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Entry Door</span>
+                                        <span class="font-medium" data-bind="doors.entry">1</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Windows Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-medium text-slate-700 flex items-center">
+                                        <i class="fas fa-window-maximize text-green-600 mr-2"></i>Windows
+                                    </h4>
+                                    <button class="text-xs text-blueprint-600 hover:text-blueprint-700">Edit</button>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Double Hung (3'x4')</span>
+                                        <span class="font-medium" data-bind="windows.doubleHung">8</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Casement (2'x3')</span>
+                                        <span class="font-medium" data-bind="windows.casement">3</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Picture Window</span>
+                                        <span class="font-medium" data-bind="windows.picture">1</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Flooring Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-medium text-slate-700 flex items-center">
+                                        <i class="fas fa-th-large text-amber-600 mr-2"></i>Flooring
+                                    </h4>
+                                    <button class="text-xs text-blueprint-600 hover:text-blueprint-700">Edit</button>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Hardwood</span>
+                                        <span class="font-medium" data-bind="flooring.hardwood">1,845 sq ft</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Tile</span>
+                                        <span class="font-medium" data-bind="flooring.tile">632 sq ft</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Carpet</span>
+                                        <span class="font-medium" data-bind="flooring.carpet">370 sq ft</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Electrical Section -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-medium text-slate-700 flex items-center">
+                                        <i class="fas fa-bolt text-yellow-600 mr-2"></i>Electrical
+                                    </h4>
+                                    <button class="text-xs text-blueprint-600 hover:text-blueprint-700">Edit</button>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Outlets</span>
+                                        <span class="font-medium" data-bind="electrical.outlets">24</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Light Fixtures</span>
+                                        <span class="font-medium" data-bind="electrical.lights">16</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-1">
+                                        <span class="text-slate-600">Switches</span>
+                                        <span class="font-medium" data-bind="electrical.switches">18</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cost Estimation -->
+                        <div class="p-4 border-t border-slate-200 bg-slate-50">
+                            <h3 class="text-sm font-semibold text-slate-900 mb-3">Cost Estimation</h3>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-slate-600">Materials</span>
+                                    <span class="font-semibold text-slate-900" data-bind="costs.materials">$45,680</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-slate-600">Labor</span>
+                                    <span class="font-semibold text-slate-900" data-bind="costs.labor">$32,150</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2 border-t border-slate-300">
+                                    <span class="text-sm font-semibold text-slate-900">Total Estimate</span>
+                                    <span class="text-lg font-bold text-blueprint-700" data-bind="costs.total">$77,830</span>
+                                </div>
+                            </div>
+                            <button class="w-full mt-3 bg-blueprint-600 text-white py-2 px-4 rounded-lg hover:bg-blueprint-700 transition-colors text-sm font-medium">
+                                Generate Detailed Quote
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Modal -->
+    <!-- @STATE: showLoadingModal:boolean = false -->
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" id="loadingModal">
+        <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+            <div class="text-center">
+                <div class="w-12 h-12 border-4 border-blueprint-200 border-t-blueprint-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <h3 class="text-lg font-semibold text-slate-900 mb-2">Processing Drawing</h3>
+                <p class="text-sm text-slate-600 mb-4">AI is analyzing your blueprint for doors, windows, and measurements...</p>
+                <div class="w-full bg-slate-200 rounded-full h-2">
+                    <div class="bg-blueprint-600 h-2 rounded-full transition-all duration-300" style="width: 65%"></div>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">This usually takes 30-60 seconds</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        
+        (function() {
+            // Initialize drawing viewer interactions
+            const drawingViewer = document.querySelector('.drawing-viewer');
+            const toolButtons = document.querySelectorAll('[data-tool]');
+            
+            // Mock AI processing simulation
+            function simulateAIProcessing() {
+                const modal = document.getElementById('loadingModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        // TODO: Update UI with AI results
+                    }, 3000);
+                }
+            }
+            
+            // Tool selection handlers
+            toolButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // TODO: Implement tool selection logic
+                    console.log('Tool selected:', this.dataset.tool);
+                });
+            });
+            
+            // File upload simulation
+            const uploadZone = document.querySelector('[data-implementation*="file upload"]');
+            if (uploadZone) {
+                uploadZone.addEventListener('click', function() {
+                    // TODO: Implement file upload functionality
+                    console.log('File upload triggered');
+                    simulateAIProcessing();
+                });
+            }
+            
+            // Zoom controls
+            let currentZoom = 100;
+            const zoomIn = document.querySelector('.fa-search-plus').parentElement;
+            const zoomOut = document.querySelector('.fa-search-minus').parentElement;
+            const zoomDisplay = document.querySelector('span:contains("100%")');
+            
+            if (zoomIn && zoomOut) {
+                zoomIn.addEventListener('click', function() {
+                    currentZoom = Math.min(currentZoom + 25, 400);
+                    // TODO: Implement actual zoom functionality
+                    console.log('Zoom in:', currentZoom + '%');
+                });
+                
+                zoomOut.addEventListener('click', function() {
+                    currentZoom = Math.max(currentZoom - 25, 25);
+                    // TODO: Implement actual zoom functionality
+                    console.log('Zoom out:', currentZoom + '%');
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ import {
 import type { Drawing } from "@shared/schema";
 
 interface FileUploadDialogProps {
-  onFileUpload: (drawing: Drawing) => void;
+  onFileUpload: (file: File) => void;
 }
 
 export default function FileUploadDialog({ onFileUpload }: FileUploadDialogProps) {
@@ -77,10 +77,6 @@ export default function FileUploadDialog({ onFileUpload }: FileUploadDialogProps
 
     if (validFiles.length > 0) {
       setUploadedFiles(validFiles);
-      // Automatically process files after upload
-      setTimeout(() => {
-        processFilesImmediately(validFiles);
-      }, 500);
     }
   };
 
@@ -88,51 +84,17 @@ export default function FileUploadDialog({ onFileUpload }: FileUploadDialogProps
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const processFiles = async () => {
+  const handleUpload = async () => {
     if (uploadedFiles.length === 0) return;
-    processFilesImmediately(uploadedFiles);
-  };
-
-  const processFilesImmediately = async (filesToProcess: File[]) => {
+    
     setIsUploading(true);
+    const firstFile = uploadedFiles[0];
     
     try {
-      const firstFile = filesToProcess[0];
-      
-      // Upload file to server
-      const formData = new FormData();
-      formData.append('file', firstFile);
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to upload file');
-      }
-      
-      const uploadResult = await response.json();
-      
-      // Create drawing object with actual file URL
-      const drawingData: Drawing = {
-        id: `drawing-${Date.now()}`,
-        projectId: "", // Will be set by the parent component when project is created
-        name: firstFile.name.replace(/\.[^/.]+$/, ""),
-        filename: firstFile.name,
-        fileUrl: uploadResult.fileUrl, // Use actual uploaded file URL
-        fileType: firstFile.type,
-        status: "complete",
-        scale: "1/4\" = 1'",
-        aiProcessed: true,
-        uploadedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
+      // Pass the file directly to the parent component
+      // The parent will handle the actual upload and drawing creation
+      onFileUpload(firstFile);
       setIsUploading(false);
-      onFileUpload(drawingData);
     } catch (error) {
       console.error('File upload failed:', error);
       setIsUploading(false);
@@ -221,19 +183,19 @@ export default function FileUploadDialog({ onFileUpload }: FileUploadDialogProps
                 ))}
                 
                 <Button 
-                  onClick={processFiles}
+                  onClick={handleUpload}
                   disabled={isUploading}
                   className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
                 >
                   {isUploading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Processing...
+                      Uploading...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Process {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''}
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''}
                     </>
                   )}
                 </Button>

@@ -42,6 +42,7 @@ interface RealtimeAnalysisPanelProps {
   isAnalyzing: boolean;
   onStartAnalysis: () => void;
   onElementHover?: (elementType: string | null) => void;
+  analysisResults: any;  
 }
 
 export default function RealtimeAnalysisPanel({ 

@@ -10,23 +10,34 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   url: string,
   method: string,
-  data?: unknown | undefined,
+  data?: any,
+  isFormData: boolean = false
 ): Promise<any> {
-  const res = await fetch(url, {
+  const options: RequestInit = {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
-  });
+  };
+
+  if (data) {
+    if (isFormData) {
+      // For file uploads, pass FormData directly.
+      // The browser will set the correct 'multipart/form-data' header.
+      options.body = data;
+    } else {
+      // For regular data, set the JSON header and stringify the body.
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(data);
+    }
+  }
+
+  const res = await fetch(url, options);
 
   await throwIfResNotOk(res);
   
-  // Handle 204 No Content responses (empty body)
   if (res.status === 204) {
     return null;
   }
   
-  // Only try to parse JSON if there's content
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
     return res.json();

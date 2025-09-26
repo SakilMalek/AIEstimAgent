@@ -55,6 +55,7 @@ interface LLMAnalysisResult {
 export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLMTakeoffProcessorProps) {
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
   const [analysisResults, setAnalysisResults] = useState<LLMAnalysisResult[]>([]);
+  const [debugInfo, setDebugInfo] = useState<string>("");
   const { toast } = useToast();
 
   const { data: existingTakeoffs = [] } = useQuery<Takeoff[]>({
@@ -64,11 +65,34 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
 
   const runLLMAnalysisMutation = useMutation({
     mutationFn: async (elementTypes: string[]) => {
+      // Debug logging
+      console.log("=== DEBUG INFO ===");
+      console.log("Drawing object:", drawing);
+      console.log("Drawing ID:", drawing.id);
+      console.log("Element types:", elementTypes);
+      
+      setDebugInfo(`Drawing ID: ${drawing.id}, Element Types: ${elementTypes.join(', ')}`);
+
       setAnalysisStatus({
         stage: 'uploading',
         progress: 10,
         message: 'Uploading floorplan to LLM processor...'
       });
+
+      // Validate drawing ID exists
+      if (!drawing.id) {
+        throw new Error("Drawing ID is missing or undefined");
+      }
+
+      const requestUrl = `/api/drawings/${drawing.id}/run-llm-takeoff`;
+      const requestData = { 
+        elementTypes,
+        llmModel: "floorplan-analyzer-v2",
+        enhancedAnalysis: true 
+      };
+
+      console.log("Request URL:", requestUrl);
+      console.log("Request data:", requestData);
 
       // Simulate LLM processing stages
       const stages = [
@@ -89,14 +113,29 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
         });
       }
 
-      // Call the actual API
-      return apiRequest(`/api/drawings/${drawing.id}/run-llm-takeoff`, "POST", { 
-        elementTypes,
-        llmModel: "floorplan-analyzer-v2",
-        enhancedAnalysis: true 
-      });
+      try {
+        // Make the actual API request
+        const response = await apiRequest(requestUrl, "POST", requestData);
+        console.log("API Response:", response);
+        return response;
+      } catch (error) {
+        console.error("API Request failed:", error);
+        
+        // Type guard to safely access error properties
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        console.error("Error details:", {
+          message: errorMessage,
+          stack: errorStack,
+          url: requestUrl,
+          data: requestData
+        });
+        throw error;
+      }
     },
     onSuccess: (data: any) => {
+      console.log("Success data:", data);
       toast({
         title: "LLM Analysis Complete",
         description: `Successfully analyzed ${data.elementsProcessed || 'multiple'} elements with ${Math.round((data.averageConfidence || 0.85) * 100)}% confidence`,
@@ -105,14 +144,16 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
       onAnalysisComplete?.();
     },
     onError: (error) => {
+      console.error("Mutation error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       setAnalysisStatus({
         stage: 'error',
         progress: 0,
-        message: 'Analysis failed. Please try again.'
+        message: `Analysis failed: ${errorMessage}`
       });
       toast({
         title: "Analysis Failed",
-        description: "The LLM analysis encountered an error. Please try again.",
+        description: `Error: ${errorMessage}`,
         variant: "destructive",
       });
     },
@@ -120,6 +161,7 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
 
   const reprocessTakeoffMutation = useMutation({
     mutationFn: async (takeoffId: string) => {
+      console.log("Reprocessing takeoff:", takeoffId);
       return apiRequest(`/api/takeoffs/${takeoffId}/reprocess`, "POST", {
         useAdvancedLLM: true,
         recalculateCosts: true
@@ -137,6 +179,7 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
   const handleRunAnalysis = () => {
     // Default to all element types for comprehensive analysis
     const allElementTypes = ['doors', 'windows', 'flooring', 'walls', 'electrical', 'plumbing', 'hvac', 'structural'];
+    console.log("Starting analysis with element types:", allElementTypes);
     runLLMAnalysisMutation.mutate(allElementTypes);
   };
 
@@ -150,6 +193,28 @@ export default function LLMTakeoffProcessor({ drawing, onAnalysisComplete }: LLM
 
   return (
     <div className="space-y-6">
+      {/* Debug Information */}
+      {debugInfo && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="text-yellow-800 text-sm">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-xs text-yellow-700 whitespace-pre-wrap">{debugInfo}</pre>
+            {runLLMAnalysisMutation.error && (
+              <div className="mt-2 p-2 bg-red-100 border border-red-200 rounded">
+                <p className="text-red-800 text-xs font-semibold">Error Details:</p>
+                <pre className="text-red-700 text-xs whitespace-pre-wrap">
+                  {runLLMAnalysisMutation.error instanceof Error 
+                    ? runLLMAnalysisMutation.error.message 
+                    : String(runLLMAnalysisMutation.error)}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* LLM Analysis Control Panel */}
       <Card>
         <CardHeader>

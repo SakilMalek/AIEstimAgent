@@ -1,14 +1,13 @@
-import { defineConfig } from "drizzle-kit";
+// drizzle.config.ts - UPDATED CODE
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
+import { defineConfig } from 'drizzle-kit';
+import 'dotenv/config'; // Loads environment variables from .env file
 
 export default defineConfig({
-  out: "./migrations",
-  schema: "./shared/schema.ts",
-  dialect: "postgresql",
+  schema: './shared/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL!, // Tells Drizzle to use the URL from your .env
   },
 });

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,27 +22,20 @@ interface TakeoffType {
   color: string;
 }
 
+// MODIFICATION: The data for the sidebar items has been updated here.
 const takeoffTypes: TakeoffType[] = [
   {
-    id: "doors",
-    name: "Doors",
-    description: "Interior and exterior doors",
+    id: "openings", // New combined ID
+    name: "Doors & Windows", // New combined name
+    description: "All door and window types",
     unit: "each",
-    icon: Building2,
+    icon: Building2, // Using one of the icons
     color: "text-blue-600 bg-blue-50 border-blue-200"
   },
   {
-    id: "windows",
-    name: "Windows", 
-    description: "All window types and sizes",
-    unit: "each",
-    icon: SquareStack,
-    color: "text-cyan-600 bg-cyan-50 border-cyan-200"
-  },
-  {
     id: "flooring",
-    name: "Flooring",
-    description: "Floor area measurements",
+    name: "Flooring & Rooms", // Renamed
+    description: "Floor area and room detection", // Updated description
     unit: "sq ft",
     icon: Maximize,
     color: "text-amber-600 bg-amber-50 border-amber-200"
@@ -211,7 +203,6 @@ export default function VerticalTakeoffSelector({
           </p>
         )}
 
-        {/* Settings Button */}
         <Button 
           variant="outline" 
           className="w-full text-slate-600 hover:text-slate-900"

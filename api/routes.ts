@@ -2,74 +2,112 @@ import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { 
-  insertProjectSchema, 
-  insertDrawingSchema, 
-  insertTakeoffSchema, 
-  insertSavedAnalysisSchema,
-  insertTradeClassSchema,
-  insertProductSkuSchema,
-  insertProjectPricingSchema,
-  insertEstimateTemplateSchema,
-  insertRegionalCostDatabaseSchema,
-  insertSupplierSchema,
-  insertMaterialPricingSchema,
-  insertChangeOrderSchema,
-  insertProfitMarginSettingsSchema,
-  insertCostHistorySchema,
-  insertCostEscalationSchema
-} from "@shared/schema";
+import { insertProjectSchema, insertDrawingSchema, insertTakeoffSchema, type Takeoff, insertSavedAnalysisSchema, insertTradeClassSchema, insertProductSkuSchema, insertProjectPricingSchema, insertEstimateTemplateSchema, insertChangeOrderSchema, insertCostEscalationSchema, insertCostHistorySchema, insertMaterialPricingSchema, insertProfitMarginSettingsSchema, insertRegionalCostDatabaseSchema, insertSupplierSchema } from "../shared/schema"; // Assuming path alias is set up
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import axios from 'axios';     // <-- ADDED IMPORT
+import FormData from 'form-data'; // <-- ADDED IMPORT
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 
-// Configure multer for file uploads
+// Uploader for proxying to AI service (uses memory)
+const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+// Uploader for saving files to the server (uses disk)
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
-
-const upload = multer({
+const diskUpload = multer({
   storage: multer.diskStorage({
     destination: uploadDir,
     filename: (req, file, cb) => {
-      const uniqueId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const ext = path.extname(file.originalname) || '.jpg'; // Default to .jpg if no extension
+      const uniqueId = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
       cb(null, uniqueId + ext);
     }
   }),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
-  fileFilter: (req: any, file: any, cb: any) => {
-    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only PDF, PNG, and JPG files are allowed.'));
-    }
-  },
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve uploaded files with proper headers
-  app.use('/uploads', express.static(uploadDir, {
-    setHeaders: (res, path) => {
-      // Set proper content type based on file content
-      if (path.includes('pdf')) {
-        res.setHeader('Content-Type', 'application/pdf');
-      } else {
-        res.setHeader('Content-Type', 'image/jpeg'); // Default for images
-      }
-    }
-  }));
+  // --- AI ANALYSIS PROXY ENDPOINT ---
+  app.get('/api/test', (req, res) => {
+    res.json({ 
+      message: 'API routing works!', 
+      timestamp: new Date().toISOString(),
+      serverPort: process.env.PORT || '5001'
+    });
+  });
   
+  // FIXED: Enhanced /api/analyze endpoint with better error handling
+  app.post('/api/analyze', memoryUpload.single('file'), async (req: MulterRequest, res) => {
+    console.log('[API] /api/analyze called');
+    console.log('[API] File received:', !!req.file);
+    console.log('[API] Body:', req.body);
+  
+    if (!req.file) {
+      console.log('[API] ERROR: No file uploaded');
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    
+    if (!req.body.types) {
+      console.log('[API] ERROR: No analysis types selected');
+      return res.status(400).json({ error: 'No analysis types selected.' });
+    }
+  
+    try {
+      const formData = new FormData();
+      formData.append('file', req.file.buffer, req.file.originalname);
+      formData.append('types', req.body.types);
+      
+      const pythonApiUrl = 'http://127.0.0.1:8000/analyze';
+      console.log('[API] Forwarding to Python service:', pythonApiUrl);
+      
+      const response = await axios.post(pythonApiUrl, formData, {
+        headers: { 
+          ...formData.getHeaders(),
+        },
+        timeout: 30000, // 30 second timeout
+      });
+  
+      console.log('[API] Python service response status:', response.status);
+      console.log('[API] Python service response received');
+      res.json(response.data);
+  
+    } catch (error: any) {
+      console.error('[API] Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        code: error.code
+      });
+  
+      if (error.code === 'ECONNREFUSED') {
+        return res.status(503).json({ 
+          error: 'Python ML service is not running. Please start the Python server on port 8000.' 
+        });
+      }
+  
+      if (error.response?.status) {
+        return res.status(error.response.status).json({ 
+          error: error.response.data || 'Python service error' 
+        });
+      }
+  
+      res.status(500).json({ 
+        error: 'Failed to analyze the drawing.',
+        details: error.message 
+      });
+    }
+  });
   // General file upload endpoint
-  app.post("/api/upload", upload.single('file'), async (req: MulterRequest, res) => {
+  app.post("/api/upload", diskUpload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -181,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects/:projectId/drawings/upload", upload.single('file'), async (req: MulterRequest, res) => {
+  app.post("/api/projects/:projectId/drawings/upload", diskUpload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -278,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid batch update data" });
       }
 
-      const results = [];
+      const results: Takeoff[] = [];
       for (const takeoffId of takeoffIds) {
         const takeoff = await storage.updateTakeoff(takeoffId, updates);
         if (takeoff) {
@@ -1365,7 +1403,22 @@ async function generateSelectiveMockTakeoffs(drawingId: string, elementTypes: st
     ]
   };
 
-  const takeoffsToCreate = [];
+  const takeoffsToCreate: Array<{
+    drawingId: string;
+    elementType: string;
+    quantity?: number;
+    unit?: string;
+    length?: number;
+    width?: number;
+    height?: number;
+    area?: number;
+    volume?: number;
+    description?: string;
+    metadata?: Record<string, any>;
+    status?: "pending" | "in_progress" | "completed" | "rejected";
+    notes?: string;
+    createdBy?: string;
+  }> = [];
   for (const elementType of elementTypes) {
     const templates = takeoffTemplates[elementType as keyof typeof takeoffTemplates];
     if (templates) {
