@@ -11,7 +11,7 @@ export default defineConfig({
   root: path.resolve(__dirname, "client"),
 
   plugins: [react()],
-  base: process.env.VITE_BASE_PATH || "/AIEstimAgent",
+  base: process.env.VITE_BASE_PATH || "/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
