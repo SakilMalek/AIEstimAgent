@@ -1,6 +1,14 @@
-# ml/requirements.txt
-fastapi
-uvicorn[standard]
-python-dotenv
-inference-sdk
-python-multipart
+# requirements.txt (server side / FastAPI)
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-dotenv==1.0.1
+
+# The correct package name (Roboflow) is 'inference', not 'inference-sdk'
+# Choose a version that supports Python 3.11 (0.5x–0.57.* commonly do)
+inference==0.57.3
+
+# If you had these, pin them too (examples):
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+pillow==10.4.0
+requests==2.32.3
