@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,7 @@ interface TakeoffSummary {
 }
 
 export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
-  const { data: takeoffs = [], isLoading } = useQuery({
+  const { data: takeoffs = [], isLoading } = useQuery<Takeoff[]>({
     queryKey: ["/api/drawings", drawing?.id, "takeoffs"],
     enabled: !!drawing?.id,
   });

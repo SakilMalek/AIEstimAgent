@@ -42,9 +42,7 @@
     "client/src/pages/*-backup.tsx",
     "client/src/pages/*-broken.tsx",
     "client/src/pages/dashboard.tsx",
-    "client/src/pages/project-detail.tsx",
     "client/src/pages/reports.tsx",
-    "client/src/components/takeoff-panel.tsx",
     "client/src/components/cost-breakdown-chart.tsx"
   ]
 }

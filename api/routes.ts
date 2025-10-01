@@ -140,6 +140,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // --- DRAWING UPLOAD ENDPOINT ---
+  app.post("/api/projects/:projectId/drawings/upload", diskUpload.single("file"), async (req: MulterRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { name, scale } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "Drawing name is required" });
+      }
+
+      // Create the drawing record with file information
+      const fileUrl = `/uploads/${req.file.filename}`;
+      const drawingData = {
+        projectId: req.params.projectId,
+        name,
+        filename: req.file.originalname,
+        fileUrl,
+        fileType: req.file.mimetype,
+        scale: scale || "1/4\" = 1'",
+        status: "pending"
+      };
+
+      const data = insertDrawingSchema.parse(drawingData);
+      const drawing = await storage.createDrawing(data);
+
+      // Trigger AI processing
+      try {
+        const formData = new FormData();
+        const fileStream = fs.createReadStream(req.file.path);
+        formData.append("file", fileStream, {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
+        });
+
+        const response = await axios.post(`${PYTHON_API}/analyze`, formData, {
+          headers: {
+            ...formData.getHeaders(),
+          },
+        });
+
+        // Update drawing status to processing
+        // Note: You might want to add an update method to storage
+        console.log("AI processing started for drawing:", drawing.id);
+      } catch (aiError) {
+        console.error("Failed to start AI processing:", aiError);
+        // Drawing is created but AI processing failed
+      }
+
+      res.status(201).json(drawing);
+    } catch (err) {
+      console.error("Drawing upload error:", err);
+      res.status(500).json({ message: "Failed to upload drawing" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

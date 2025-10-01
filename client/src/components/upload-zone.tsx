@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { createApiUrl } from "@/config/api";
 import { CloudUpload, X, Upload } from "lucide-react";
 
 interface UploadZoneProps {
@@ -24,7 +25,8 @@ export default function UploadZone({ projectId, onUploadComplete, onCancel }: Up
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch(`/api/projects/${projectId}/drawings/upload`, {
+      const url = createApiUrl(`/api/projects/${projectId}/drawings/upload`);
+      const response = await fetch(url, {
         method: "POST",
         body: formData,
       });

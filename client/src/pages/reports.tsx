@@ -34,16 +34,16 @@ export default function Reports() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("30");
   const [selectedProject, setSelectedProject] = useState<string>("all");
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
 
   // Get cost analysis for each project using our AI backend
   const projectAnalyses = useQuery({
-    queryKey: ["/api/project-analyses", projects.map(p => p.id)],
+    queryKey: ["/api/project-analyses", projects.map((p: Project) => p.id)],
     queryFn: async () => {
       const analyses = await Promise.all(
-        projects.map(async (project) => {
+        projects.map(async (project: Project) => {
           try {
             const [costAnalysis, riskAssessment, costTrends] = await Promise.all([
               fetch(`/api/projects/${project.id}/cost-analysis`).then(r => r.json()),
@@ -72,14 +72,14 @@ export default function Reports() {
   // Calculate aggregate metrics from AI analysis
   const aggregateMetrics = {
     totalProjects: projects.length,
-    totalCost: analysisData.reduce((sum, item) => sum + (item?.costAnalysis?.totalCost || 0), 0),
+    totalCost: analysisData.reduce((sum: number, item: any) => sum + (item?.costAnalysis?.totalCost || 0), 0),
     avgEfficiencyScore: analysisData.length > 0 ? 
-      analysisData.reduce((sum, item) => sum + (item?.costAnalysis?.overallScore || 0), 0) / analysisData.length : 0,
-    highRiskProjects: analysisData.filter(item => 
+      analysisData.reduce((sum: number, item: any) => sum + (item?.costAnalysis?.overallScore || 0), 0) / analysisData.length : 0,
+    highRiskProjects: analysisData.filter((item: any) => 
       item?.riskAssessment?.riskLevel === 'high' || item?.riskAssessment?.riskLevel === 'critical'
     ).length,
-    costSavingsOpportunities: analysisData.reduce((sum, item) => {
-      const savings = item?.costAnalysis?.insights?.filter(insight => 
+    costSavingsOpportunities: analysisData.reduce((sum: number, item: any) => {
+      const savings = item?.costAnalysis?.insights?.filter((insight: string) => 
         insight.includes('savings') || insight.includes('bulk purchasing')
       ).length || 0;
       return sum + savings;
@@ -87,10 +87,10 @@ export default function Reports() {
   };
 
   // Category breakdown from cost analysis
-  const categoryBreakdown = analysisData.reduce((acc, item) => {
+  const categoryBreakdown = analysisData.reduce((acc: any[], item: any) => {
     if (item?.costAnalysis?.costByCategory) {
-      item.costAnalysis.costByCategory.forEach(category => {
-        const existing = acc.find(c => c.category === category.category);
+      item.costAnalysis.costByCategory.forEach((category: any) => {
+        const existing = acc.find((c: any) => c.category === category.category);
         if (existing) {
           existing.total += category.total;
           existing.percentage = ((existing.total / aggregateMetrics.totalCost) * 100);
@@ -108,18 +108,18 @@ export default function Reports() {
 
   // Efficiency distribution
   const efficiencyDistribution = {
-    excellent: analysisData.filter(item => item?.costAnalysis?.efficiency === 'excellent').length,
-    good: analysisData.filter(item => item?.costAnalysis?.efficiency === 'good').length,
-    average: analysisData.filter(item => item?.costAnalysis?.efficiency === 'average').length,
-    poor: analysisData.filter(item => item?.costAnalysis?.efficiency === 'poor').length,
+    excellent: analysisData.filter((item: any) => item?.costAnalysis?.efficiency === 'excellent').length,
+    good: analysisData.filter((item: any) => item?.costAnalysis?.efficiency === 'good').length,
+    average: analysisData.filter((item: any) => item?.costAnalysis?.efficiency === 'average').length,
+    poor: analysisData.filter((item: any) => item?.costAnalysis?.efficiency === 'poor').length,
   };
 
   // Risk level distribution
   const riskDistribution = {
-    low: analysisData.filter(item => item?.riskAssessment?.riskLevel === 'low').length,
-    medium: analysisData.filter(item => item?.riskAssessment?.riskLevel === 'medium').length,
-    high: analysisData.filter(item => item?.riskAssessment?.riskLevel === 'high').length,
-    critical: analysisData.filter(item => item?.riskAssessment?.riskLevel === 'critical').length,
+    low: analysisData.filter((item: any) => item?.riskAssessment?.riskLevel === 'low').length,
+    medium: analysisData.filter((item: any) => item?.riskAssessment?.riskLevel === 'medium').length,
+    high: analysisData.filter((item: any) => item?.riskAssessment?.riskLevel === 'high').length,
+    critical: analysisData.filter((item: any) => item?.riskAssessment?.riskLevel === 'critical').length,
   };
 
   return (
@@ -153,7 +153,7 @@ export default function Reports() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Projects</SelectItem>
-                {projects.map(project => (
+                {projects.map((project: Project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
@@ -172,7 +172,7 @@ export default function Reports() {
       <div className="p-6 space-y-6">
         {projectAnalyses.isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4].map((i: number) => (
               <Card key={i} className="animate-pulse">
                 <CardContent className="p-6">
                   <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
@@ -254,7 +254,7 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(efficiencyDistribution).map(([level, count]) => {
+                    {Object.entries(efficiencyDistribution).map(([level, count]: [string, number]) => {
                       const percentage = projects.length > 0 ? (count / projects.length) * 100 : 0;
                       const colors = {
                         excellent: 'bg-green-500',
@@ -297,7 +297,7 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(riskDistribution).map(([level, count]) => {
+                    {Object.entries(riskDistribution).map(([level, count]: [string, number]) => {
                       const percentage = projects.length > 0 ? (count / projects.length) * 100 : 0;
                       const colors = {
                         low: 'bg-green-500',
@@ -360,7 +360,7 @@ export default function Reports() {
                           </tr>
                         </thead>
                         <tbody>
-                          {analysisData.map((item, index) => (
+                          {analysisData.map((item: any, index: number) => (
                             <tr key={index} className="border-b hover:bg-slate-50">
                               <td className="py-3">
                                 <div>

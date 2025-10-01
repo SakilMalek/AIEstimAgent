@@ -1,268 +1,253 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/layout";
 import DrawingViewer from "@/components/drawing-viewer";
+import InteractiveFloorPlan from "@/components/interactive-floor-plan";
 import VerticalTakeoffSelector from "@/components/vertical-takeoff-selector";
-import LLMTakeoffProcessor from "@/components/llm-takeoff-processor";
+import RealtimeAnalysisPanel from "@/components/realtime-analysis-panel";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Download,
-  Ruler,
-  Square,
-  Hash
-} from "lucide-react";
-import type { Drawing } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Download, Ruler, Square, Hash, MessageSquare, PanelLeft, PanelRight } from "lucide-react";
+import type { Drawing, Project } from "@shared/schema";
+import { useDetectionsStore } from "@/store/useDetectionsStore";
+import type { Detection } from "@/store/useDetectionsStore";
+
+const isDetection = (value: unknown): value is Detection => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Detection;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.cls === "string" &&
+    Array.isArray(candidate.points)
+  );
+};
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   const [selectedTakeoffTypes, setSelectedTakeoffTypes] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
+  const [activeViewMode, setActiveViewMode] = useState<'view' | 'annotate'>('view');
+  const [activeTool, setActiveTool] = useState<'ruler' | 'area' | 'count' | null>(null);
+  const [selectedScale, setSelectedScale] = useState("1/4\" = 1'");
 
   const { toast } = useToast();
+  const setDetections = useDetectionsStore(s => s.setDetections);
 
-  const handleRunAnalysis = () => {
-    if (selectedTakeoffTypes.length === 0) {
-      toast({
-        title: "No takeoff types selected",
-        description: "Please select at least one element type to analyze.",
-        variant: "destructive",
-      });
+  const handleRunAnalysis = async () => {
+    if (!currentDrawing || !currentDrawing.fileUrl) {
+      toast({ title: "No Drawing", description: "Please upload a drawing first.", variant: "destructive" });
       return;
     }
-    
+    const typesToAnalyze = selectedTakeoffTypes.length > 0 ? selectedTakeoffTypes : ['openings', 'flooring', 'walls'];
+    if (typesToAnalyze.length === 0) {
+      toast({ title: "No Selection", description: "Please select at least one takeoff type.", variant: "destructive" });
+      return;
+    }
+
     setIsAnalyzing(true);
-    // Simulate analysis process
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    setAnalysisResults(null);
+
+    try {
+      const response = await fetch(currentDrawing.fileUrl);
+      const imageBlob = await response.blob();
+      const imageFile = new File([imageBlob], currentDrawing.filename!, { type: imageBlob.type });
+
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      formData.append('types', JSON.stringify(typesToAnalyze));
+      formData.append('scale', selectedScale);
+
+      const results = await apiRequest('/api/analyze', 'POST', formData, true);
+
+      setAnalysisResults(results);
+
+      if (results && results.predictions) {
+        const allPredictions = Object.values(results.predictions)
+          .flat()
+          .filter((item): item is Detection => isDetection(item));
+
+        setDetections(allPredictions);
+      } else {
+        setDetections([]);
+      }
+      
       toast({
         title: "Analysis Complete",
-        description: `Successfully analyzed ${selectedTakeoffTypes.length} element types.`,
+        description: `Successfully analyzed ${typesToAnalyze.length} element types.`,
       });
-    }, 5000);
+    } catch (error) {
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  // Use a sample drawing for demonstration
-  const sampleDrawing: Drawing = {
-    id: "sample-1",
-    projectId: "proj-1", 
-    name: "Ground Floor Plan",
-    filename: "ground-floor.pdf",
-    fileSize: 2048000,
-    uploadedAt: new Date().toISOString(),
-    status: "complete",
-    aiProcessed: true
+  const createNewProject = async (drawingName: string): Promise<Project> => {
+    const projectData = { name: `Project - ${drawingName}`, description: `Auto-generated project for ${drawingName}`, status: "active" };
+    const project = await apiRequest("/api/projects", "POST", projectData);
+    queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    return project;
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setIsUploading(true);
+    setCurrentDrawing(null);
+    setAnalysisResults(null);
+    setDetections([]);
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      const uploadResult = await apiRequest('/api/upload', 'POST', uploadFormData, true);
+      
+      let projectToUse = currentProject || await createNewProject(file.name);
+      setCurrentProject(projectToUse);
+      
+      const drawingData = {
+        projectId: projectToUse.id,
+        name: file.name,
+        filename: uploadResult.filename,
+        fileUrl: uploadResult.fileUrl,
+        fileType: file.type,
+        status: "complete",
+        scale: selectedScale,
+        aiProcessed: false
+      };
+      const savedDrawing = await apiRequest(`/api/projects/${projectToUse.id}/drawings`, "POST", drawingData);
+      
+      setCurrentDrawing(savedDrawing);
+      toast({ title: "Upload Successful", description: "Select takeoff types and click 'Run AI Analysis'." });
+    } catch (error) {
+      toast({ title: "Upload Failed", description: error instanceof Error ? error.message : "An unknown error occurred", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
     <Layout>
-      <div className="flex h-[calc(100vh-73px)] overflow-hidden">
-        {/* Vertical Takeoff Selector - Left Sidebar */}
-        <VerticalTakeoffSelector
-          selectedTypes={selectedTakeoffTypes}
-          onSelectionChange={setSelectedTakeoffTypes}
-          onRunAnalysis={handleRunAnalysis}
-          isAnalyzing={isAnalyzing}
-        />
+      <div className="flex h-full overflow-hidden">
+        <div className="hidden lg:flex">
+          <VerticalTakeoffSelector
+            selectedTypes={selectedTakeoffTypes}
+            onSelectionChange={setSelectedTakeoffTypes}
+            onRunAnalysis={handleRunAnalysis}
+            isAnalyzing={isAnalyzing}
+          />
+        </div>
 
-        {/* Main Content */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Project Actions Bar */}
-          <div className="bg-white border-b border-slate-200 px-6 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {currentProject?.name || "No Project Selected"}
-                </h2>
-                {currentProject && (
-                  <span className="text-sm text-slate-500">
-                    {drawings.length} drawing{drawings.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-blueprint-600 hover:bg-blueprint-700" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Project
+          <div className="bg-white border-b border-slate-200 px-4 lg:px-6 py-3">
+            <div className="flex items-center">
+               <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden mr-2">
+                    <PanelLeft className="w-5 h-5" />
                   </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New Project</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="dashboard-project-name">Project Name</Label>
-                      <Input
-                        id="dashboard-project-name"
-                        value={newProject.name}
-                        onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                        placeholder="Enter project name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dashboard-project-location">Location</Label>
-                      <Input
-                        id="dashboard-project-location"
-                        value={newProject.location || ""}
-                        onChange={(e) => setNewProject({ ...newProject, location: e.target.value })}
-                        placeholder="Enter project location"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dashboard-project-client">Client</Label>
-                      <Input
-                        id="dashboard-project-client"
-                        value={newProject.client || ""}
-                        onChange={(e) => setNewProject({ ...newProject, client: e.target.value })}
-                        placeholder="Enter client name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dashboard-project-description">Description</Label>
-                      <Input
-                        id="dashboard-project-description"
-                        value={newProject.description || ""}
-                        onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                        placeholder="Enter project description"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dashboard-project-status">Status</Label>
-                      <select
-                        id="dashboard-project-status"
-                        value={newProject.status}
-                        onChange={(e) => setNewProject({ ...newProject, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                      >
-                        <option value="active">Active</option>
-                        <option value="on-hold">On Hold</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </div>
-                    <div className="flex space-x-2 pt-4">
-                      <Button
-                        onClick={handleCreateProject}
-                        disabled={createProjectMutation.isPending}
-                        className="flex-1 bg-blueprint-600 hover:bg-blueprint-700"
-                      >
-                        {createProjectMutation.isPending ? "Creating..." : "Create Project"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsCreateDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-80">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Takeoff Types Menu</SheetTitle>
+                    <SheetDescription>Select building elements to detect and measure from this list.</SheetDescription>
+                  </SheetHeader>
+                  <VerticalTakeoffSelector
+                    selectedTypes={selectedTakeoffTypes}
+                    onSelectionChange={setSelectedTakeoffTypes}
+                    onRunAnalysis={handleRunAnalysis}
+                    isAnalyzing={isAnalyzing}
+                  />
+                </SheetContent>
+              </Sheet>
 
-          {/* Drawing Toolbar */}
-          <div className="bg-slate-50 border-b border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-sm font-medium text-slate-900">
-                  {selectedDrawing?.name || "Select a drawing"}
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-slate-500">Scale:</span>
-                  <select className="text-xs border border-slate-300 rounded px-2 py-1">
-                    <option>1/4" = 1'</option>
-                    <option>1/8" = 1'</option>
-                    <option>1/2" = 1'</option>
-                  </select>
-                </div>
-                
-                {/* Manual Measurement Tools */}
-                <div className="flex items-center space-x-1 border-l border-slate-300 pl-3">
-                  <Button variant="ghost" size="sm" title="Linear measurement">
-                    <Ruler className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" title="Area measurement">
-                    <Square className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" title="Count items">
-                    <Hash className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                {/* View Controls */}
-                <div className="flex items-center bg-white rounded-lg p-1 border">
-                  <Button variant="ghost" size="sm" className="bg-blueprint-50 text-blueprint-700 text-xs">
-                    View
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-slate-600 text-xs">
-                    Annotate
-                  </Button>
-                </div>
-                
-                {/* AI Takeoff Button */}
-                <Dialog open={isTakeoffDialogOpen} onOpenChange={setIsTakeoffDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button 
-                      className="bg-purple-600 hover:bg-purple-700" 
-                      size="sm"
-                      disabled={!selectedDrawing}
-                    >
-                      <Brain className="w-4 h-4 mr-2" />
-                      Run AI Takeoff
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>AI Takeoff Analysis</DialogTitle>
-                    </DialogHeader>
-                    {selectedDrawing && (
-                      <TakeoffTypeSelector 
-                        drawing={selectedDrawing} 
-                        onComplete={() => setIsTakeoffDialogOpen(false)}
-                      />
-                    )}
-                  </DialogContent>
-                </Dialog>
+              <span className="text-sm text-slate-500 truncate">
+                {currentProject ? `${currentProject.name} - ` : ""}{currentDrawing?.name || "Upload a drawing"}
+              </span>
 
-                {/* Export */}
-                <Button className="bg-green-600 hover:bg-green-700" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Report
-                </Button>
-              </div>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden ml-auto">
+                    <PanelRight className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="p-0 w-full sm:w-96">
+                   <SheetHeader className="sr-only">
+                    <SheetTitle>AI Analysis Panel</SheetTitle>
+                    <SheetDescription>View the results of the real-time AI takeoff processing.</SheetDescription>
+                  </SheetHeader>
+                   <RealtimeAnalysisPanel 
+                      drawing={currentDrawing}
+                      selectedTypes={selectedTakeoffTypes}
+                      isAnalyzing={isAnalyzing}
+                      onStartAnalysis={handleRunAnalysis}
+                      onElementHover={setHighlightedElement}
+                      analysisResults={analysisResults}
+                    />
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
 
           <div className="flex-1 flex overflow-hidden">
-            {/* Drawing Viewer */}
-            <DrawingViewer drawing={selectedDrawing} />
-
-            {/* Enhanced LLM Takeoff Panel */}
-            <div className="w-96 bg-white border-l border-slate-200 flex flex-col overflow-hidden">
-              <div className="p-4 border-b border-slate-200">
-                <h2 className="text-lg font-semibold text-slate-900">AI Takeoff Analysis</h2>
-                <p className="text-sm text-slate-600">Advanced LLM-powered floorplan analysis</p>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                {selectedDrawing ? (
-                  <LLMTakeoffProcessor 
-                    drawing={selectedDrawing} 
-                    onAnalysisComplete={() => {
-                      // Refresh takeoff data after analysis
-                    }}
-                  />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                      <Brain className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                      <p className="text-sm text-slate-600">Select a drawing to begin AI analysis</p>
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 p-2 lg:p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 lg:space-x-4">
+                      <h3 className="text-sm font-medium text-slate-900 hidden md:block truncate max-w-xs">{currentDrawing?.name || "No drawing selected"}</h3>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-slate-500 hidden sm:inline">Scale:</span>
+                        <select className="text-xs border border-slate-300 rounded px-2 py-1" value={selectedScale} onChange={(e) => setSelectedScale(e.target.value)}>
+                          <option>1/4" = 1'</option>
+                          <option>1/8" = 1'</option>
+                          <option>1/2" = 1'</option>
+                          <option>1" = 1'</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
+              
+              <InteractiveFloorPlan
+                drawing={currentDrawing}
+                highlightedElement={highlightedElement}
+                activeViewMode={activeViewMode}
+                activeTool={activeTool}
+                selectedScale={selectedScale}
+                onElementClick={() => {}}
+                onMeasurement={() => {}}
+              />
+              
+              {!currentDrawing && (
+                <DrawingViewer drawing={null} onFileUpload={handleFileUpload} isUploading={isUploading} />
+              )}
+            </div>
+
+            <div className="w-96 flex-col hidden lg:flex">
+              <div className="bg-white p-4 border-b border-slate-200">
+                <div className="flex items-center space-x-3">
+                    <Button className="bg-green-600 hover:bg-green-700" size="sm"><Download className="w-4 h-4 mr-2" />Export Report</Button>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" size="sm"><MessageSquare className="w-4 h-4 mr-2" />AI Assistant</Button>
+                </div>
               </div>
+              
+              <RealtimeAnalysisPanel 
+                drawing={currentDrawing} 
+                selectedTypes={selectedTakeoffTypes} 
+                isAnalyzing={isAnalyzing} 
+                onStartAnalysis={handleRunAnalysis} 
+                onElementHover={setHighlightedElement}
+                analysisResults={analysisResults}
+              />
             </div>
           </div>
         </main>

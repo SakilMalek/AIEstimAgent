@@ -63,6 +63,15 @@ import {
 } from "lucide-react";
 import type { Project, InsertProject } from "@shared/schema";
 
+// Create a more specific type for form state
+type ProjectFormData = {
+  name: string;
+  description: string | null;
+  location: string | null;
+  client: string | null;
+  status: string;
+};
+
 export default function Projects() {
   const [, setLocation] = useLocation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -73,18 +82,18 @@ export default function Projects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
-  const [newProject, setNewProject] = useState<InsertProject>({
+  const [newProject, setNewProject] = useState<ProjectFormData>({
     name: "",
-    description: "",
-    location: "",
-    client: "",
+    description: null,
+    location: null,
+    client: null,
     status: "active",
   });
-  const [editProject, setEditProject] = useState<InsertProject>({
+  const [editProject, setEditProject] = useState<ProjectFormData>({
     name: "",
-    description: "",
-    location: "",
-    client: "",
+    description: null,
+    location: null,
+    client: null,
     status: "active",
   });
   
@@ -168,9 +177,9 @@ export default function Projects() {
       setIsCreateDialogOpen(false);
       setNewProject({
         name: "",
-        description: "",
-        location: "",
-        client: "",
+        description: null,
+        location: null,
+        client: null,
         status: "active",
       });
     },
@@ -233,16 +242,16 @@ export default function Projects() {
       });
       return;
     }
-    createProjectMutation.mutate(newProject);
+    createProjectMutation.mutate(newProject as InsertProject);
   };
 
   const handleEditProject = (project: Project) => {
     setSelectedProject(project);
     setEditProject({
       name: project.name,
-      description: project.description || "",
-      location: project.location || "", 
-      client: project.client || "",
+      description: project.description,
+      location: project.location, 
+      client: project.client,
       status: project.status,
     });
     setIsEditDialogOpen(true);
@@ -258,7 +267,7 @@ export default function Projects() {
       return;
     }
     if (selectedProject) {
-      updateProjectMutation.mutate({ id: selectedProject.id, data: editProject });
+      updateProjectMutation.mutate({ id: selectedProject.id, data: editProject as InsertProject });
     }
   };
 
@@ -627,7 +636,7 @@ export default function Projects() {
               <Input
                 id="project-location"
                 value={newProject.location || ""}
-                onChange={(e) => setNewProject({ ...newProject, location: e.target.value })}
+                onChange={(e) => setNewProject({ ...newProject, location: e.target.value || null })}
                 placeholder="Enter project location"
                 data-testid="input-new-project-location"
               />
@@ -637,7 +646,7 @@ export default function Projects() {
               <Input
                 id="project-client"
                 value={newProject.client || ""}
-                onChange={(e) => setNewProject({ ...newProject, client: e.target.value })}
+                onChange={(e) => setNewProject({ ...newProject, client: e.target.value || null })}
                 placeholder="Enter client name"
                 data-testid="input-new-project-client"
               />
@@ -647,7 +656,7 @@ export default function Projects() {
               <Input
                 id="project-description"
                 value={newProject.description || ""}
-                onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                onChange={(e) => setNewProject({ ...newProject, description: e.target.value || null })}
                 placeholder="Enter project description"
                 data-testid="input-new-project-description"
               />
@@ -708,7 +717,7 @@ export default function Projects() {
               <Input
                 id="edit-project-location"
                 value={editProject.location || ""}
-                onChange={(e) => setEditProject({ ...editProject, location: e.target.value })}
+                onChange={(e) => setEditProject({ ...editProject, location: e.target.value || null })}
                 placeholder="Enter project location"
                 data-testid="input-edit-project-location"
               />
@@ -718,7 +727,7 @@ export default function Projects() {
               <Input
                 id="edit-project-client"
                 value={editProject.client || ""}
-                onChange={(e) => setEditProject({ ...editProject, client: e.target.value })}
+                onChange={(e) => setEditProject({ ...editProject, client: e.target.value || null })}
                 placeholder="Enter client name"
                 data-testid="input-edit-project-client"
               />
@@ -728,7 +737,7 @@ export default function Projects() {
               <Input
                 id="edit-project-description"
                 value={editProject.description || ""}
-                onChange={(e) => setEditProject({ ...editProject, description: e.target.value })}
+                onChange={(e) => setEditProject({ ...editProject, description: e.target.value || null })}
                 placeholder="Enter project description"
                 data-testid="input-edit-project-description"
               />
