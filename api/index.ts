@@ -1,33 +1,30 @@
-// api/index.ts (only add the marked block)
-import 'dotenv/config';
 import express from "express";
-import path from "path"; // <--- add
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import path from "path";
+import { fileURLToPath } from "url";
 
-(async () => {
-  const app = express();
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: false }));
+// Needed when using ES modules (so __dirname works)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // --- ADD: serve /uploads upfront (works in prod + dev) ---
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  app.use("/uploads", express.static(uploadsDir));
-  // ---------------------------------------------------------
+const app = express();
 
-  // Load API endpoints and get server (HTTP)
-  const server = await registerRoutes(app);
+// ✅ Serve static client files from /dist/client
+app.use(express.static(path.join(__dirname, "client")));
 
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+// ✅ Example API route
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
-  const port = parseInt(process.env.PORT || '5001', 10);
-  const host = process.env.HOST || '127.0.0.1';
+// ✅ Catch-all route: serves index.html for SPA routing
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(__dirname, "client", "index.html"));
+});
 
-  server.listen(port, host, () => {
-    log(`Server listening on http://${host}:${port}`);
-  });
-})();
+// ✅ Use Render's dynamic port or fallback to 5000 locally
+const PORT = parseInt(process.env.PORT || "5000", 10);
+
+// ✅ Bind to 0.0.0.0 (so Render can expose it)
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(` Server running on http://0.0.0.0:${PORT}`);
+});
