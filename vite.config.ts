@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -10,7 +11,7 @@ export default defineConfig({
   // Your app lives under client/, so make that the Vite root.
   root: path.resolve(__dirname, "client"),
 
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   base: process.env.VITE_BASE_PATH || "/",
   resolve: {
     alias: {

@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --background: hsl(0, 0%, 100%);
@@ -60,109 +58,119 @@
   --radius: 0.5rem;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply font-sans antialiased bg-background text-foreground;
-  }
+* {
+  border-color: var(--border);
 }
 
-@layer utilities {
-  .blueprint-50 {
-    background-color: var(--blueprint-50);
-  }
-  .blueprint-100 {
-    background-color: var(--blueprint-100);
-  }
-  .blueprint-200 {
-    background-color: var(--blueprint-200);
-  }
-  .blueprint-300 {
-    background-color: var(--blueprint-300);
-  }
-  .blueprint-400 {
-    background-color: var(--blueprint-400);
-  }
-  .blueprint-500 {
-    background-color: var(--blueprint-500);
-  }
-  .blueprint-600 {
-    background-color: var(--blueprint-600);
-  }
-  .blueprint-700 {
-    background-color: var(--blueprint-700);
-  }
-  .blueprint-800 {
-    background-color: var(--blueprint-800);
-  }
-  .blueprint-900 {
-    background-color: var(--blueprint-900);
-  }
+body {
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background);
+  color: var(--foreground);
+}
 
-  .text-blueprint-50 {
-    color: var(--blueprint-50);
-  }
-  .text-blueprint-100 {
-    color: var(--blueprint-100);
-  }
-  .text-blueprint-200 {
-    color: var(--blueprint-200);
-  }
-  .text-blueprint-300 {
-    color: var(--blueprint-300);
-  }
-  .text-blueprint-400 {
-    color: var(--blueprint-400);
-  }
-  .text-blueprint-500 {
-    color: var(--blueprint-500);
-  }
-  .text-blueprint-600 {
-    color: var(--blueprint-600);
-  }
-  .text-blueprint-700 {
-    color: var(--blueprint-700);
-  }
-  .text-blueprint-800 {
-    color: var(--blueprint-800);
-  }
-  .text-blueprint-900 {
-    color: var(--blueprint-900);
-  }
+/* Fix appearance property compatibility */
+input,
+select,
+textarea,
+button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
 
-  .border-blueprint-50 {
-    border-color: var(--blueprint-50);
-  }
-  .border-blueprint-100 {
-    border-color: var(--blueprint-100);
-  }
-  .border-blueprint-200 {
-    border-color: var(--blueprint-200);
-  }
-  .border-blueprint-300 {
-    border-color: var(--blueprint-300);
-  }
-  .border-blueprint-400 {
-    border-color: var(--blueprint-400);
-  }
-  .border-blueprint-500 {
-    border-color: var(--blueprint-500);
-  }
-  .border-blueprint-600 {
-    border-color: var(--blueprint-600);
-  }
-  .border-blueprint-700 {
-    border-color: var(--blueprint-700);
-  }
-  .border-blueprint-800 {
-    border-color: var(--blueprint-800);
-  }
-  .border-blueprint-900 {
-    border-color: var(--blueprint-900);
-  }
+.blueprint-50 {
+  background-color: var(--blueprint-50);
+}
+.blueprint-100 {
+  background-color: var(--blueprint-100);
+}
+.blueprint-200 {
+  background-color: var(--blueprint-200);
+}
+.blueprint-300 {
+  background-color: var(--blueprint-300);
+}
+.blueprint-400 {
+  background-color: var(--blueprint-400);
+}
+.blueprint-500 {
+  background-color: var(--blueprint-500);
+}
+.blueprint-600 {
+  background-color: var(--blueprint-600);
+}
+.blueprint-700 {
+  background-color: var(--blueprint-700);
+}
+.blueprint-800 {
+  background-color: var(--blueprint-800);
+}
+.blueprint-900 {
+  background-color: var(--blueprint-900);
+}
+
+.text-blueprint-50 {
+  color: var(--blueprint-50);
+}
+.text-blueprint-100 {
+  color: var(--blueprint-100);
+}
+.text-blueprint-200 {
+  color: var(--blueprint-200);
+}
+.text-blueprint-300 {
+  color: var(--blueprint-300);
+}
+.text-blueprint-400 {
+  color: var(--blueprint-400);
+}
+.text-blueprint-500 {
+  color: var(--blueprint-500);
+}
+.text-blueprint-600 {
+  color: var(--blueprint-600);
+}
+.text-blueprint-700 {
+  color: var(--blueprint-700);
+}
+.text-blueprint-800 {
+  color: var(--blueprint-800);
+}
+.text-blueprint-900 {
+  color: var(--blueprint-900);
+}
+
+.border-blueprint-50 {
+  border-color: var(--blueprint-50);
+}
+.border-blueprint-100 {
+  border-color: var(--blueprint-100);
+}
+.border-blueprint-200 {
+  border-color: var(--blueprint-200);
+}
+.border-blueprint-300 {
+  border-color: var(--blueprint-300);
+}
+.border-blueprint-400 {
+  border-color: var(--blueprint-400);
+}
+.border-blueprint-500 {
+  border-color: var(--blueprint-500);
+}
+.border-blueprint-600 {
+  border-color: var(--blueprint-600);
+}
+.border-blueprint-700 {
+  border-color: var(--blueprint-700);
+}
+.border-blueprint-800 {
+  border-color: var(--blueprint-800);
+}
+.border-blueprint-900 {
+  border-color: var(--blueprint-900);
 }
 
 /* Animation for results appearing */
