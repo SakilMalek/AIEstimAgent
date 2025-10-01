@@ -40,6 +40,22 @@ const diskUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Essential middleware
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  
+  // CORS middleware
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+  
   // Serve uploaded files statically
   app.use("/uploads", express.static(uploadDir));
   
@@ -119,6 +135,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/projects/:id", async (req, res) => {
+    try {
+      const data = insertProjectSchema.partial().parse(req.body);
+      const project = await storage.updateProject(req.params.id, data);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (err) {
+      console.error("Project update error:", err);
+      res.status(400).json({ message: "Invalid project data" });
+    }
+  });
+
+  app.delete("/api/projects/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteProject(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.status(204).send();
+    } catch (err) {
+      console.error("Project deletion error:", err);
+      res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
   // --- DRAWINGS ROUTES ---
   app.get("/api/projects/:projectId/drawings", async (req, res) => {
     try {
@@ -175,16 +218,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filename: req.file.originalname,
           contentType: req.file.mimetype,
         });
+        
+        // Add required parameters that ML service expects
+        formData.append("detect_floors", "true");
+        formData.append("detect_columns", "true");
+        formData.append("detect_walls", "true");
+        
+        // Add scale if provided
+        if (scale) {
+          formData.append("scale", scale);
+        }
 
         const response = await axios.post(`${PYTHON_API}/analyze`, formData, {
           headers: {
             ...formData.getHeaders(),
           },
+          timeout: 120000, // 2 minutes timeout
         });
 
         // Update drawing status to processing
         // Note: You might want to add an update method to storage
         console.log("AI processing started for drawing:", drawing.id);
+        console.log("AI response:", response.data);
       } catch (aiError) {
         console.error("Failed to start AI processing:", aiError);
         // Drawing is created but AI processing failed
@@ -194,6 +249,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("Drawing upload error:", err);
       res.status(500).json({ message: "Failed to upload drawing" });
+    }
+  });
+
+  // --- TAKEOFFS ROUTES ---
+  app.get("/api/drawings/:drawingId/takeoffs", async (req, res) => {
+    try {
+      const takeoffs = await storage.getTakeoffsByDrawing(req.params.drawingId);
+      res.json(takeoffs);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch takeoffs" });
+    }
+  });
+
+  app.post("/api/drawings/:drawingId/takeoffs", async (req, res) => {
+    try {
+      const data = { ...req.body, drawingId: req.params.drawingId };
+      const takeoff = await storage.createTakeoff(data);
+      res.status(201).json(takeoff);
+    } catch (err) {
+      console.error("Takeoff creation error:", err);
+      res.status(400).json({ message: "Invalid takeoff data" });
+    }
+  });
+
+  app.put("/api/takeoffs/:id", async (req, res) => {
+    try {
+      const takeoff = await storage.updateTakeoff(req.params.id, req.body);
+      if (!takeoff) {
+        return res.status(404).json({ message: "Takeoff not found" });
+      }
+      res.json(takeoff);
+    } catch (err) {
+      console.error("Takeoff update error:", err);
+      res.status(400).json({ message: "Invalid takeoff data" });
+    }
+  });
+
+  // --- ANALYSIS RESULTS ENDPOINT ---
+  app.post("/api/drawings/:drawingId/analysis", async (req, res) => {
+    try {
+      // This endpoint receives AI analysis results and converts them to takeoffs
+      const { results, scale } = req.body;
+      const drawingId = req.params.drawingId;
+      
+      if (!results || !results.models) {
+        return res.status(400).json({ message: "Invalid analysis results" });
+      }
+
+      const createdTakeoffs: any[] = [];
+      
+      // Process each model's results
+      for (const [modelType, detections] of Object.entries(results.models)) {
+        const detectionsArray = detections as any[];
+        for (const detection of detectionsArray) {
+          const takeoffData = {
+            drawingId,
+            elementType: modelType,
+            elementName: detection.class || 'Unknown',
+            itemType: detection.class || 'Unknown',
+            quantity: 1,
+            originalQuantity: 1,
+            coordinates: detection.bbox || detection.points || null,
+            detectedByAi: true,
+            unit: modelType === 'floors' ? 'sq ft' : 'count',
+            verified: false
+          };
+          
+          const takeoff = await storage.createTakeoff(takeoffData);
+          createdTakeoffs.push(takeoff);
+        }
+      }
+
+      // Update drawing status to complete
+      await storage.updateDrawing(drawingId, { status: 'complete', aiProcessed: true });
+
+      res.status(201).json({ 
+        message: "Analysis results processed", 
+        takeoffs: createdTakeoffs 
+      });
+    } catch (err) {
+      console.error("Analysis processing error:", err);
+      res.status(500).json({ message: "Failed to process analysis results" });
     }
   });
 

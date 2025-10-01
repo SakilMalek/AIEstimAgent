@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { db } from "./db";
 import { 
   projects, 
@@ -17,7 +17,7 @@ import {
   profitMarginSettings,
   costHistory,
   costEscalation
-} from "@shared/schema";
+} from "../shared/schema";
 import { 
   type Project, type InsertProject, 
   type Drawing, type InsertDrawing, 
@@ -35,7 +35,7 @@ import {
   type ProfitMarginSettings, type InsertProfitMarginSettings,
   type CostHistory, type InsertCostHistory,
   type CostEscalation, type InsertCostEscalation
-} from "@shared/schema";
+} from "../shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -50,7 +50,6 @@ export interface IStorage {
   getDrawing(id: string): Promise<Drawing | undefined>;
   getDrawingsByProject(projectId: string): Promise<Drawing[]>;
   createDrawing(drawing: InsertDrawing): Promise<Drawing>;
-  updateDrawing(id: string, drawing: Partial<InsertDrawing>): Promise<Drawing | undefined>;
   
   // Takeoffs
   getTakeoff(id: string): Promise<Takeoff | undefined>;
@@ -680,17 +679,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRegionalCostDataByLocation(region?: string, state?: string, zipCode?: string): Promise<RegionalCostDatabase[]> {
-    let query = db.select().from(regionalCostDatabase);
+    const conditions: Parameters<typeof and> = [];
     
     if (region) {
-      query = query.where(eq(regionalCostDatabase.region, region));
+      conditions.push(eq(regionalCostDatabase.region, region));
     }
     if (state) {
-      query = query.where(eq(regionalCostDatabase.state, state));
+      conditions.push(eq(regionalCostDatabase.state, state));
     }
     if (zipCode) {
-      query = query.where(eq(regionalCostDatabase.zipCode, zipCode));
+      conditions.push(eq(regionalCostDatabase.zipCode, zipCode));
     }
+
+    const query = conditions.length > 0 
+      ? db.select().from(regionalCostDatabase).where(and(...conditions))
+      : db.select().from(regionalCostDatabase);
 
     return await query;
   }
@@ -740,7 +743,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.update(suppliers)
       .set({ isActive: false })
       .where(eq(suppliers.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Material Pricing Methods
@@ -817,7 +820,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteChangeOrder(id: string): Promise<boolean> {
     const result = await db.delete(changeOrders).where(eq(changeOrders.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Profit Margin Settings Methods
@@ -827,18 +830,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProfitMarginSettingsByScope(scope: string, scopeId?: string): Promise<ProfitMarginSettings[]> {
-    let query = db.select().from(profitMarginSettings)
-      .where(eq(profitMarginSettings.scope, scope));
+    const conditions: Parameters<typeof and> = [
+      eq(profitMarginSettings.scope, scope),
+      eq(profitMarginSettings.isActive, true)
+    ];
 
     if (scopeId) {
       if (scope === 'project') {
-        query = query.where(eq(profitMarginSettings.projectId, scopeId));
+        conditions.push(eq(profitMarginSettings.projectId, scopeId));
       } else if (scope === 'trade_class') {
-        query = query.where(eq(profitMarginSettings.tradeClassId, scopeId));
+        conditions.push(eq(profitMarginSettings.tradeClassId, scopeId));
       }
     }
 
-    return await query.where(eq(profitMarginSettings.isActive, true));
+    return await db.select().from(profitMarginSettings)
+      .where(and(...conditions));
   }
 
   async createProfitMarginSettings(settings: InsertProfitMarginSettings): Promise<ProfitMarginSettings> {
@@ -871,8 +877,10 @@ export class DatabaseStorage implements IStorage {
     dateThreshold.setDate(dateThreshold.getDate() - days);
 
     return await db.select().from(costHistory)
-      .where(eq(costHistory.skuId, skuId))
-      .where(sql`${costHistory.recordDate} >= ${dateThreshold}`)
+      .where(and(
+        eq(costHistory.skuId, skuId),
+        sql`${costHistory.recordDate} >= ${dateThreshold}`
+      ))
       .orderBy(costHistory.recordDate);
   }
 
@@ -895,10 +903,12 @@ export class DatabaseStorage implements IStorage {
   async getActiveCostEscalation(projectId: string): Promise<CostEscalation[]> {
     const currentDate = new Date();
     return await db.select().from(costEscalation)
-      .where(eq(costEscalation.projectId, projectId))
-      .where(eq(costEscalation.isActive, true))
-      .where(sql`${costEscalation.effectiveDate} <= ${currentDate}`)
-      .where(sql`${costEscalation.endDate} IS NULL OR ${costEscalation.endDate} > ${currentDate}`);
+      .where(and(
+        eq(costEscalation.projectId, projectId),
+        eq(costEscalation.isActive, true),
+        sql`${costEscalation.effectiveDate} <= ${currentDate}`,
+        sql`${costEscalation.endDate} IS NULL OR ${costEscalation.endDate} > ${currentDate}`
+      ));
   }
 
   async createCostEscalation(escalation: InsertCostEscalation): Promise<CostEscalation> {
@@ -925,7 +935,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     // Get all drawings for this project first, then get takeoffs for all drawings
     const projectDrawings = await db.select().from(drawings).where(eq(drawings.projectId, projectId));
-    let projectTakeoffs = [];
+    let projectTakeoffs: Takeoff[] = [];
     
     if (projectDrawings.length > 0) {
       const drawingIds = projectDrawings.map(d => d.id);
@@ -985,7 +995,7 @@ export class DatabaseStorage implements IStorage {
     else efficiency = 'poor';
     
     // Generate insights
-    const insights = [];
+    const insights: string[] = [];
     if (totalCost > 100000) insights.push('Large project - consider bulk purchasing for savings');
     if (maxCategoryPercentage > 40) insights.push(`${costByCategory[0].category} dominates costs (${maxCategoryPercentage.toFixed(1)}%)`);
     if (averageCostPerSqFt > 120) insights.push('Above-average cost per sq ft - review material specifications');
@@ -1012,7 +1022,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     // Get all drawings for this project first, then get takeoffs for all drawings
     const projectDrawings = await db.select().from(drawings).where(eq(drawings.projectId, projectId));
-    let projectTakeoffs = [];
+    let projectTakeoffs: Takeoff[] = [];
     
     if (projectDrawings.length > 0) {
       const drawingIds = projectDrawings.map(d => d.id);
@@ -1020,7 +1030,12 @@ export class DatabaseStorage implements IStorage {
     }
     const analysis = await this.analyzeProjectCostEfficiency(projectId);
     
-    const opportunities = [];
+    const opportunities: Array<{
+      category: string;
+      description: string;
+      estimatedSavings: number;
+      priority: 'high' | 'medium' | 'low';
+    }> = [];
     let potentialSavings = 0;
     
     // High-cost category optimization
@@ -1100,7 +1115,7 @@ export class DatabaseStorage implements IStorage {
     else ranking = 'premium';
     
     // Analyze cost factors
-    const factors = [];
+    const factors: Array<{ factor: string; impact: number; description: string }> = [];
     
     // Regional factor
     factors.push({
@@ -1149,7 +1164,13 @@ export class DatabaseStorage implements IStorage {
     const analysis = await this.analyzeProjectCostEfficiency(projectId);
     const benchmark = await this.generateCostBenchmarkReport(projectId);
     
-    const risks = [];
+    const risks: Array<{
+      category: string;
+      severity: 'low' | 'medium' | 'high';
+      probability: number;
+      impact: string;
+      mitigation: string;
+    }> = [];
     let riskScore = 0;
     
     // Cost overrun risk
@@ -1209,7 +1230,7 @@ export class DatabaseStorage implements IStorage {
     else riskLevel = 'low';
     
     // Generate recommendations
-    const recommendations = [];
+    const recommendations: string[] = [];
     if (riskScore > 20) {
       recommendations.push('Consider implementing a risk management plan');
       recommendations.push('Establish contingency budget of 10-15%');
@@ -1276,7 +1297,11 @@ export class DatabaseStorage implements IStorage {
     ];
     
     // Generate monthly projections
-    const monthlyProjections = [];
+    const monthlyProjections: Array<{
+      month: number;
+      projectedCost: number;
+      confidence: number;
+    }> = [];
     let runningCost = currentCost;
     
     for (let month = 1; month <= months; month++) {
