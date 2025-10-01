@@ -4,7 +4,7 @@ services:
     name: aiestim-agent-api
     env: python
     rootDir: ml                # <-- exact folder that contains requirements.txt & your FastAPI app
-    pythonVersion: 3.11.9
+    # pythonVersion: 3.11.9
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     plan: free
