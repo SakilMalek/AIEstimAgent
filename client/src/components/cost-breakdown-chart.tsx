@@ -87,7 +87,7 @@ export function CostBreakdownChart({
             padding: 20
           },
           legend: {
-            position: chartType === 'bar' ? ('top' as const) : ('right' as const),
+            position: chartType === 'bar' ? 'top' as const : 'right' as const,
             labels: {
               generateLabels: (chart: Chart) => {
                 const dataset = chart.data.datasets[0];

@@ -60,8 +60,8 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
     costs: { materials: 0, labor: 0, total: 0 },
   };
 
-  if (takeoffs) {
-    takeoffs.forEach((takeoff: Takeoff) => {
+  if (takeoffs && Array.isArray(takeoffs)) {
+    (takeoffs as Takeoff[]).forEach((takeoff: Takeoff) => {
       const cost = takeoff.totalCost || 0;
       summary.costs.total += cost;
 
@@ -136,7 +136,7 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
               </div>
             ))}
           </div>
-        ) : takeoffs && takeoffs.length > 0 ? (
+        ) : takeoffs && Array.isArray(takeoffs) && takeoffs.length > 0 ? (
           <>
             {/* Summary Cards */}
             <div className="p-4 space-y-3">

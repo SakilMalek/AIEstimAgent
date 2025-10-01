@@ -679,7 +679,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRegionalCostDataByLocation(region?: string, state?: string, zipCode?: string): Promise<RegionalCostDatabase[]> {
-    const conditions: Parameters<typeof and> = [];
+    const conditions: any[] = [];
     
     if (region) {
       conditions.push(eq(regionalCostDatabase.region, region));
@@ -691,11 +691,11 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(regionalCostDatabase.zipCode, zipCode));
     }
 
-    const query = conditions.length > 0 
-      ? db.select().from(regionalCostDatabase).where(and(...conditions))
-      : db.select().from(regionalCostDatabase);
-
-    return await query;
+    if (conditions.length > 0) {
+      return await db.select().from(regionalCostDatabase).where(and(...conditions));
+    } else {
+      return await db.select().from(regionalCostDatabase);
+    }
   }
 
   async createRegionalCostData(data: InsertRegionalCostDatabase): Promise<RegionalCostDatabase> {
@@ -743,7 +743,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.update(suppliers)
       .set({ isActive: false })
       .where(eq(suppliers.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Material Pricing Methods
@@ -820,7 +820,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteChangeOrder(id: string): Promise<boolean> {
     const result = await db.delete(changeOrders).where(eq(changeOrders.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Profit Margin Settings Methods
@@ -830,7 +830,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProfitMarginSettingsByScope(scope: string, scopeId?: string): Promise<ProfitMarginSettings[]> {
-    const conditions: Parameters<typeof and> = [
+    const conditions: any[] = [
       eq(profitMarginSettings.scope, scope),
       eq(profitMarginSettings.isActive, true)
     ];
@@ -939,7 +939,7 @@ export class DatabaseStorage implements IStorage {
     
     if (projectDrawings.length > 0) {
       const drawingIds = projectDrawings.map(d => d.id);
-      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`);
+      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`) as Takeoff[];
     }
     
     if (projectTakeoffs.length === 0) {
@@ -1026,7 +1026,7 @@ export class DatabaseStorage implements IStorage {
     
     if (projectDrawings.length > 0) {
       const drawingIds = projectDrawings.map(d => d.id);
-      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`);
+      projectTakeoffs = await db.select().from(takeoffs).where(sql`${takeoffs.drawingId} IN (${drawingIds.map(id => `'${id}'`).join(',')})`) as Takeoff[];
     }
     const analysis = await this.analyzeProjectCostEfficiency(projectId);
     
