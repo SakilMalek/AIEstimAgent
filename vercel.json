@@ -1,17 +1,11 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "vite build --outDir dist",
   "installCommand": "npm install",
-  "outputDirectory": "dist/client",
+  "outputDirectory": "dist",
   "framework": "vite",
   "env": {
     "VITE_API_URL": "https://aiestimagent-api.onrender.com",
     "VITE_ML_URL": "https://aiestimagent.onrender.com"
-  },
-  "build": {
-    "env": {
-      "VITE_API_URL": "https://aiestimagent-api.onrender.com",
-      "VITE_ML_URL": "https://aiestimagent.onrender.com"
-    }
   },
   "rewrites": [
     {
