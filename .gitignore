@@ -1,10 +1,10 @@
 node_modules
-dist
+# dist
 .DS_Store
 api /public
-vite.config.ts.*
+# vite.config.ts.*
 *.tar.gz
-.env
+# .env
 uploads/
 ml/venv/
 __pycache__/
