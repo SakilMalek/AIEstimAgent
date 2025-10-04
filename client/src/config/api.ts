@@ -42,6 +42,9 @@ const getMlBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl();
 export const ML_BASE_URL = getMlBaseUrl();
 
+console.log('🔗 API Base URL:', API_BASE_URL);
+console.log('🤖 ML Base URL:', ML_BASE_URL);
+
 // Helper function to create full API URLs
 export const createApiUrl = (endpoint: string): string => {
   // If endpoint already starts with http, return as is
@@ -55,7 +58,9 @@ export const createApiUrl = (endpoint: string): string => {
   }
   
   // Otherwise, prepend the base URL
-  return `${API_BASE_URL}${endpoint}`;
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  console.log(`🔗 API URL: ${endpoint} → ${fullUrl}`);
+  return fullUrl;
 };
 
 // Helper function to create full ML URLs
@@ -65,5 +70,7 @@ export const createMlUrl = (endpoint: string): string => {
     return endpoint;
   }
   
-  return `${ML_BASE_URL}${endpoint}`;
+  const fullUrl = `${ML_BASE_URL}${endpoint}`;
+  console.log(`🤖 ML URL: ${endpoint} → ${fullUrl}`);
+  return fullUrl;
 };

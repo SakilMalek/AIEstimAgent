@@ -53,13 +53,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'http://localhost:5001'
     ];
     
+    console.log('[CORS] Request from origin:', origin);
+    
+    // Always set CORS headers
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
     if (origin && allowedOrigins.includes(origin)) {
       res.header('Access-Control-Allow-Origin', origin);
       res.header('Access-Control-Allow-Credentials', 'true');
+      console.log('[CORS] Allowed origin:', origin);
+    } else {
+      // For non-matching origins, still allow but without credentials
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      console.log('[CORS] Non-matching origin, allowing anyway:', origin);
     }
-    
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
