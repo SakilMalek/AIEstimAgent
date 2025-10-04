@@ -61,12 +61,25 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="AIEstimAgent — ML API", version="1.0.0")
 
-# CORS (relaxed; tighten for production)
+# CORS configuration for production
+allowed_origins = [
+    "https://estimagent.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5001"
+]
+
+# Use environment variable if set, otherwise use default allowed origins
+cors_origins = os.getenv("CORS_ALLOW_ORIGINS")
+if cors_origins:
+    allowed_origins = cors_origins.split(",")
+
+print(f"[ML] CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "*").split(","),
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
