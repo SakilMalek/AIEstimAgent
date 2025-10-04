@@ -91,11 +91,71 @@ def _image_size_from_bytes(data: bytes) -> tuple[int, int]:
     with Image.open(io.BytesIO(data)) as im:
         return im.width, im.height
 
+def _calculate_polygon_area(points: List[Dict[str, float]]) -> float:
+    """Calculate area of a polygon using the shoelace formula."""
+    if len(points) < 3:
+        return 0.0
+    
+    area = 0.0
+    n = len(points)
+    for i in range(n):
+        j = (i + 1) % n
+        area += points[i]["x"] * points[j]["y"]
+        area -= points[j]["x"] * points[i]["y"]
+    return abs(area) / 2.0
+
+def _calculate_polygon_perimeter(points: List[Dict[str, float]]) -> float:
+    """Calculate perimeter of a polygon."""
+    if len(points) < 2:
+        return 0.0
+    
+    perimeter = 0.0
+    n = len(points)
+    for i in range(n):
+        j = (i + 1) % n
+        dx = points[j]["x"] - points[i]["x"]
+        dy = points[j]["y"] - points[i]["y"]
+        perimeter += (dx * dx + dy * dy) ** 0.5
+    return perimeter
+
+def _convert_to_real_units(pixel_value: float, scale: Optional[float], unit: str = "sq ft") -> float:
+    """Convert pixel measurements to real-world units using scale factor.
+    
+    Scale represents the drawing scale factor:
+    - For 1/4" = 1' scale: scale = 0.25 (1/4 inch on drawing = 1 foot in reality)
+    
+    Assumption: The drawing is scanned/uploaded at approximately 96 DPI (standard screen resolution)
+    - At 96 DPI: 1 inch on drawing = 96 pixels
+    - For 1/4" = 1' scale: 1 foot in reality = 0.25" on drawing = 24 pixels
+    - Therefore: 1 pixel = 1/(96 * scale) feet = 1/24 feet ≈ 0.042 feet for 1/4" scale
+    """
+    if not scale or scale <= 0:
+        return pixel_value
+    
+    # Assume 96 DPI (pixels per inch) for scanned drawings
+    # This is a reasonable default for screen-resolution images
+    DPI = 96.0
+    
+    # Calculate feet per pixel:
+    # - scale is in inches per foot (e.g., 0.25 for 1/4" = 1')
+    # - scale * DPI gives pixels per foot
+    # - 1 / (scale * DPI) gives feet per pixel
+    pixels_per_foot = scale * DPI
+    feet_per_pixel = 1.0 / pixels_per_foot if pixels_per_foot > 0 else 0.0
+    
+    if unit == "sq ft":
+        # For area: square the conversion factor
+        return pixel_value * (feet_per_pixel ** 2)
+    else:  # linear measurements (perimeter, length, width, height)
+        # For length: direct multiplication
+        return pixel_value * feet_per_pixel
+
 def _normalize_predictions(
     raw: Dict[str, Any],
     img_w: int,
     img_h: int,
     filter_classes: Optional[List[str]] = None,
+    scale: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     """
     Normalize Roboflow predictions and optionally filter by class names.
@@ -105,6 +165,7 @@ def _normalize_predictions(
         img_w: Image width
         img_h: Image height
         filter_classes: If provided, only include predictions with these class names
+        scale: Scale factor for converting pixels to real-world units
     """
     preds = raw.get("predictions", []) or raw.get("data", {}).get("predictions", [])
     out: List[Dict[str, Any]] = []
@@ -116,12 +177,20 @@ def _normalize_predictions(
         if filter_classes and class_name not in filter_classes:
             continue
             
+        # Generate unique ID for this detection
+        item_id = str(uuid.uuid4())
+        
         item: Dict[str, Any] = {
+            "id": item_id,
             "class": class_name,
             "confidence": float(p.get("confidence", 0.0)),
+            "category": class_name.lower() if class_name else "unknown",
+            "metrics": {},
+            "mask": [],
+            "display": {},  # Initialize display object
         }
 
-        # Bounding box variant
+        # Bounding box variant (for doors, windows, etc.)
         if all(k in p for k in ("x", "y", "width", "height")):
             x = float(p["x"])
             y = float(p["y"])
@@ -138,8 +207,15 @@ def _normalize_predictions(
                     },
                 }
             )
+            
+            # Add display metrics for openings (doors/windows)
+            if class_name and class_name.lower() in ["door", "window"]:
+                item["display"].update({
+                    "width": _convert_to_real_units(w, scale, "ft"),
+                    "height": _convert_to_real_units(h, scale, "ft"),
+                })
 
-        # Polygon variant
+        # Polygon variant (for rooms, walls)
         if "points" in p and isinstance(p["points"], list):
             pts = p["points"]
             item["points"] = pts
@@ -148,6 +224,53 @@ def _normalize_predictions(
                 for pt in pts
                 if isinstance(pt, dict) and "x" in pt and "y" in pt and img_w and img_h
             ]
+            # Convert points to mask format expected by frontend
+            item["mask"] = [
+                {"x": pt["x"], "y": pt["y"]}
+                for pt in pts
+                if isinstance(pt, dict) and "x" in pt and "y" in pt
+            ]
+            
+            # Calculate area and perimeter for polygon detections
+            if len(item["mask"]) >= 3:
+                # Calculate in pixels first
+                pixel_area = _calculate_polygon_area(item["mask"])
+                pixel_perimeter = _calculate_polygon_perimeter(item["mask"])
+                
+                # Add display metrics based on detection type
+                if class_name and "room" in class_name.lower():
+                    # For rooms: area_sqft and perimeter_ft
+                    item["display"].update({
+                        "area_sqft": _convert_to_real_units(pixel_area, scale, "sq ft"),
+                        "perimeter_ft": _convert_to_real_units(pixel_perimeter, scale, "ft"),
+                    })
+                elif class_name and "wall" in class_name.lower():
+                    # For walls: perimeter_ft (length) and area_sqft
+                    # Perimeter represents the wall length (Linear Feet)
+                    # Area can be used for wall surface area calculations
+                    perimeter_ft = _convert_to_real_units(pixel_perimeter, scale, "ft")
+                    area_sqft = _convert_to_real_units(pixel_area, scale, "sq ft")
+                    item["display"].update({
+                        "perimeter_ft": perimeter_ft,
+                        "area_sqft": area_sqft,
+                        # Keep legacy fields for backward compatibility
+                        "inner_perimeter": perimeter_ft,
+                        "outer_perimeter": perimeter_ft,
+                    })
+                else:
+                    # Generic polygon - provide both area and perimeter
+                    item["display"].update({
+                        "area_sqft": _convert_to_real_units(pixel_area, scale, "sq ft"),
+                        "perimeter_ft": _convert_to_real_units(pixel_perimeter, scale, "ft"),
+                    })
+                
+                # Also add to metrics for consistency
+                item["metrics"].update({
+                    "area_pixels": pixel_area,
+                    "perimeter_pixels": pixel_perimeter,
+                    "area_sqft": item["display"].get("area_sqft", 0.0),
+                    "perimeter_ft": item["display"].get("perimeter_ft", 0.0),
+                })
 
         out.append(item)
     return out
@@ -239,9 +362,9 @@ async def analyze(
             types_to_analyze = ["rooms", "walls", "doors", "windows"]
         
         # Determine which models to run
-        detect_rooms = any(t in types_to_analyze for t in ["rooms", "floors"])
+        detect_rooms = any(t in types_to_analyze for t in ["rooms", "floors", "flooring"])
         detect_walls = "walls" in types_to_analyze
-        detect_doors_windows = any(t in types_to_analyze for t in ["doors", "windows", "columns"])
+        detect_doors_windows = any(t in types_to_analyze for t in ["doors", "windows", "columns", "openings"])
         
         # Read and save image
         data = await file.read()
@@ -262,11 +385,11 @@ async def analyze(
         if overlap is not None:
             infer_kwargs["overlap"] = overlap
 
-        results: Dict[str, Any] = {
+        results = {
             "image": {"width": img_w, "height": img_h},
             "scale": scale,
             "filename": file.filename,
-            "models": {},
+            "predictions": {},
         }
         errors: Dict[str, str] = {}
 
@@ -277,7 +400,7 @@ async def analyze(
             else:
                 try:
                     raw = _infer_image(temp_path, model_id=ROOM_MODEL_ID, api_key=ROOM_API_KEY, **infer_kwargs)
-                    results["models"]["rooms"] = _normalize_predictions(raw, img_w, img_h)
+                    results["predictions"]["rooms"] = _normalize_predictions(raw, img_w, img_h, scale=scale)
                 except Exception as e:
                     errors["rooms"] = str(e)
 
@@ -288,22 +411,22 @@ async def analyze(
             else:
                 try:
                     raw = _infer_image(temp_path, model_id=WALL_MODEL_ID, api_key=WALL_API_KEY, **infer_kwargs)
-                    results["models"]["walls"] = _normalize_predictions(raw, img_w, img_h)
+                    results["predictions"]["walls"] = _normalize_predictions(raw, img_w, img_h, scale=scale)
                 except Exception as e:
                     errors["walls"] = str(e)
 
         # Run door/window detection (filter out rooms and walls from this model)
         if detect_doors_windows:
             if not DOORWINDOW_MODEL_ID:
-                errors["doors_windows"] = "doors/windows model not configured"
+                errors["openings"] = "doors/windows model not configured"
             else:
                 try:
                     raw = _infer_image(temp_path, model_id=DOORWINDOW_MODEL_ID, api_key=DOORWINDOW_API_KEY, **infer_kwargs)
                     # Filter to only include door and window classes
-                    door_window_preds = _normalize_predictions(raw, img_w, img_h, filter_classes=["door", "window", "Door", "Window"])
-                    results["models"]["doors_windows"] = door_window_preds
+                    door_window_preds = _normalize_predictions(raw, img_w, img_h, filter_classes=["door", "window", "Door", "Window"], scale=scale)
+                    results["predictions"]["openings"] = door_window_preds
                 except Exception as e:
-                    errors["doors_windows"] = str(e)
+                    errors["openings"] = str(e)
 
         if errors:
             results["errors"] = errors

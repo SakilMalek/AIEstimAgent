@@ -5,11 +5,14 @@ import DrawingViewer from "@/components/drawing-viewer";
 import InteractiveFloorPlan from "@/components/interactive-floor-plan";
 import VerticalTakeoffSelector from "@/components/vertical-takeoff-selector";
 import RealtimeAnalysisPanel from "@/components/realtime-analysis-panel";
+import { ReportGeneratorComponent } from "@/components/report-generator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import CalibrationTool from "@/components/calibration-tool";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Ruler, Square, Hash, MessageSquare, PanelLeft, PanelRight } from "lucide-react";
+import { Download, Ruler, Square, Hash, MessageSquare, PanelLeft, PanelRight, Hand, FileText } from "lucide-react";
 import type { Drawing, Project } from "@shared/schema";
 import { useDetectionsStore } from "@/store/useDetectionsStore";
 import type { Detection } from "@/store/useDetectionsStore";
@@ -36,6 +39,11 @@ export default function Dashboard() {
   const [activeViewMode, setActiveViewMode] = useState<'view' | 'annotate'>('view');
   const [activeTool, setActiveTool] = useState<'ruler' | 'area' | 'count' | null>(null);
   const [selectedScale, setSelectedScale] = useState("1/4\" = 1'");
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationPoints, setCalibrationPoints] = useState<{ x: number; y: number }[]>([]);
+  const [customPixelsPerFoot, setCustomPixelsPerFoot] = useState<number | null>(null);
+  const [isPanMode, setIsPanMode] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   const { toast } = useToast();
   // MODIFICATION: The Zustand hook is now called at the top level, which is correct.
@@ -46,7 +54,7 @@ export default function Dashboard() {
       toast({ title: "No Drawing", description: "Please upload a drawing first.", variant: "destructive" });
       return;
     }
-    const typesToAnalyze = selectedTakeoffTypes.length > 0 ? selectedTakeoffTypes : ['openings', 'flooring', 'walls'];
+    const typesToAnalyze = selectedTakeoffTypes.length > 0 ? selectedTakeoffTypes : ['flooring', 'openings', 'walls'];
     if (typesToAnalyze.length === 0) {
       toast({ title: "No Selection", description: "Please select at least one takeoff type.", variant: "destructive" });
       return;
@@ -60,14 +68,22 @@ export default function Dashboard() {
       const imageBlob = await response.blob();
       const imageFile = new File([imageBlob], currentDrawing.filename!, { type: imageBlob.type });
 
-      // Convert scale string to numeric value (e.g., "1/4\" = 1'" -> 0.25)
-      const scaleMap: { [key: string]: number } = {
-        '1/4" = 1\'': 0.25,
-        '1/8" = 1\'': 0.125,
-        '1/2" = 1\'': 0.5,
-        '1" = 1\'': 1.0,
-      };
-      const scaleValue = scaleMap[selectedScale] || 0.25;
+      // Use custom calibrated scale if available, otherwise use standard scale
+      let scaleValue: number;
+      if (customPixelsPerFoot) {
+        // Custom calibration: convert pixels per foot to scale factor
+        // Assuming 96 DPI: scale = pixels_per_foot / 96
+        scaleValue = customPixelsPerFoot / 96;
+      } else {
+        // Convert scale string to numeric value (e.g., "1/4\" = 1'" -> 0.25)
+        const scaleMap: { [key: string]: number } = {
+          '1/4" = 1\'': 0.25,
+          '1/8" = 1\'': 0.125,
+          '1/2" = 1\'': 0.5,
+          '1" = 1\'': 1.0,
+        };
+        scaleValue = scaleMap[selectedScale] || 0.25;
+      }
 
       const formData = new FormData();
       formData.append('file', imageFile);
@@ -86,6 +102,20 @@ export default function Dashboard() {
           .filter((item): item is Detection => isDetection(item));
 
         setDetections(allPredictions);
+        
+        // Save analysis results to database as takeoffs
+        try {
+          await apiRequest(`/api/drawings/${currentDrawing.id}/analysis`, 'POST', {
+            results: results,
+            scale: scaleValue
+          });
+          
+          // Invalidate takeoffs query to refresh the takeoff panel
+          queryClient.invalidateQueries({ queryKey: ["/api/drawings", currentDrawing.id, "takeoffs"] });
+        } catch (saveError) {
+          console.error("Failed to save analysis results:", saveError);
+          // Don't show error to user as the analysis itself succeeded
+        }
       } else {
         setDetections([]); // Clear detections if the analysis returns no predictions
       }
@@ -182,9 +212,20 @@ export default function Dashboard() {
                 </SheetContent>
               </Sheet>
 
-              <span className="text-sm text-slate-500 truncate">
-                {currentProject ? `${currentProject.name} - ` : ""}{currentDrawing?.name || "Upload a drawing"}
-              </span>
+              <div className="flex items-center gap-2">
+                {currentProject && (
+                  <span className="text-sm font-medium text-slate-900">{currentProject.name}</span>
+                )}
+                {currentProject && currentDrawing && (
+                  <span className="text-slate-300">/</span>
+                )}
+                {currentDrawing && (
+                  <span className="text-sm text-slate-600">{currentDrawing.name}</span>
+                )}
+                {!currentProject && !currentDrawing && (
+                  <span className="text-sm text-slate-400">No drawing selected</span>
+                )}
+              </div>
 
               <Sheet>
                 <SheetTrigger asChild>
@@ -215,16 +256,65 @@ export default function Dashboard() {
                 <div className="bg-slate-50 border-b border-slate-200 p-2 lg:p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 lg:space-x-4">
-                      <h3 className="text-sm font-medium text-slate-900 hidden md:block truncate max-w-xs">{currentDrawing?.name || "No drawing selected"}</h3>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs text-slate-500 hidden sm:inline">Scale:</span>
-                        <select className="text-xs border border-slate-300 rounded px-2 py-1" value={selectedScale} onChange={(e) => setSelectedScale(e.target.value)}>
-                          <option>1/4" = 1'</option>
-                          <option>1/8" = 1'</option>
-                          <option>1/2" = 1'</option>
-                          <option>1" = 1'</option>
-                        </select>
+                        {!customPixelsPerFoot ? (
+                          <>
+                            <span className="text-xs text-slate-500 hidden sm:inline">Scale:</span>
+                            <select className="text-xs border border-slate-300 rounded px-2 py-1" value={selectedScale} onChange={(e) => setSelectedScale(e.target.value)} disabled={isCalibrating}>
+                              <option>1/4" = 1'</option>
+                              <option>1/8" = 1'</option>
+                              <option>1/2" = 1'</option>
+                              <option>1" = 1'</option>
+                            </select>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">Calibrated:</span>
+                            <span className="text-xs font-medium text-blue-600">{customPixelsPerFoot.toFixed(1)} px/ft</span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setCustomPixelsPerFoot(null)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              Reset
+                            </Button>
+                          </div>
+                        )}
                       </div>
+                      <CalibrationTool
+                        isActive={isCalibrating}
+                        points={calibrationPoints}
+                        onActivate={() => {
+                          setIsCalibrating(true);
+                          setIsPanMode(false);
+                        }}
+                        onComplete={(pixelsPerFoot) => {
+                          setCustomPixelsPerFoot(pixelsPerFoot);
+                          setIsCalibrating(false);
+                          setCalibrationPoints([]);
+                          toast({
+                            title: "Calibration Complete",
+                            description: `Scale set to ${pixelsPerFoot.toFixed(1)} pixels per foot`,
+                          });
+                        }}
+                        onCancel={() => {
+                          setIsCalibrating(false);
+                          setCalibrationPoints([]);
+                        }}
+                      />
+                      <Button
+                        variant={isPanMode ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setIsPanMode(!isPanMode);
+                          setIsCalibrating(false);
+                        }}
+                        className="w-9 h-9 p-0"
+                        title={isPanMode ? "Pan Mode Active (Click to disable)" : "Pan/Move Tool"}
+                      >
+                        <Hand className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -237,6 +327,15 @@ export default function Dashboard() {
                 selectedScale={selectedScale}
                 onElementClick={() => {}}
                 onMeasurement={() => {}}
+                analysisResults={analysisResults}
+                isCalibrating={isCalibrating}
+                calibrationPoints={calibrationPoints}
+                isPanMode={isPanMode}
+                onCalibrationClick={(x, y) => {
+                  if (calibrationPoints.length < 2) {
+                    setCalibrationPoints([...calibrationPoints, { x, y }]);
+                  }
+                }}
               />
               
               {!currentDrawing && (
@@ -246,9 +345,111 @@ export default function Dashboard() {
 
             <div className="w-96 flex-col hidden lg:flex">
               <div className="bg-white p-4 border-b border-slate-200">
-                <div className="flex items-center space-x-3">
-                    <Button className="bg-green-600 hover:bg-green-700" size="sm"><Download className="w-4 h-4 mr-2" />Export Report</Button>
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" size="sm"><MessageSquare className="w-4 h-4 mr-2" />AI Assistant</Button>
+                <div className="flex items-center space-x-2">
+                    <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className="bg-green-600 hover:bg-green-700 flex-1" 
+                          size="sm"
+                          disabled={!currentProject || !currentDrawing}
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Export Report
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Generate Project Report</DialogTitle>
+                        </DialogHeader>
+                        {currentProject && currentDrawing && (() => {
+                          // Convert analysis results to takeoffs format
+                          const takeoffs = [];
+                          if (analysisResults?.predictions) {
+                            const { rooms = [], walls = [], openings = [] } = analysisResults.predictions;
+                            
+                            // Add rooms
+                            rooms.forEach((room: any, idx: number) => {
+                              takeoffs.push({
+                                id: room.id || `room-${idx}`,
+                                projectId: currentProject.id,
+                                drawingId: currentDrawing.id,
+                                elementType: 'room',
+                                name: room.class || `Room ${idx + 1}`,
+                                quantity: 1,
+                                area: room.display?.area_sqft || 0,
+                                length: room.display?.perimeter_ft || 0,
+                                unit: 'sq ft',
+                                unitCost: 0,
+                                totalCost: 0,
+                                verified: false,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                              });
+                            });
+                            
+                            // Add walls
+                            walls.forEach((wall: any, idx: number) => {
+                              takeoffs.push({
+                                id: wall.id || `wall-${idx}`,
+                                projectId: currentProject.id,
+                                drawingId: currentDrawing.id,
+                                elementType: 'wall',
+                                name: wall.class || `Wall ${idx + 1}`,
+                                quantity: 1,
+                                area: wall.display?.area_sqft || 0,
+                                length: wall.display?.perimeter_ft || 0,
+                                unit: 'LF',
+                                unitCost: 0,
+                                totalCost: 0,
+                                verified: false,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                              });
+                            });
+                            
+                            // Add openings
+                            openings.forEach((opening: any, idx: number) => {
+                              takeoffs.push({
+                                id: opening.id || `opening-${idx}`,
+                                projectId: currentProject.id,
+                                drawingId: currentDrawing.id,
+                                elementType: opening.class?.toLowerCase().includes('door') ? 'door' : 'window',
+                                name: opening.class || `Opening ${idx + 1}`,
+                                quantity: 1,
+                                area: 0,
+                                length: 0,
+                                unit: 'EA',
+                                unitCost: 0,
+                                totalCost: 0,
+                                verified: false,
+                                createdAt: new Date(),
+                                updatedAt: new Date()
+                              });
+                            });
+                          }
+                          
+                          return (
+                            <ReportGeneratorComponent
+                              project={currentProject}
+                              takeoffs={takeoffs as any}
+                              drawings={[currentDrawing]}
+                              analyses={analysisResults ? [{
+                                id: 'current',
+                                drawingId: currentDrawing.id,
+                                projectId: currentProject.id,
+                                predictions: analysisResults.predictions || {},
+                                createdAt: new Date(),
+                                analysisType: 'full'
+                              } as any] : []}
+                            />
+                          );
+                        })()}
+                      </DialogContent>
+                    </Dialog>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white flex-1" size="sm">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      AI Chat
+                    </Button>
                 </div>
               </div>
               

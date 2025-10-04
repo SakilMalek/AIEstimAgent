@@ -88,6 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("[API] Python service response received.");
+      console.log("[API] ML Response:", JSON.stringify(r.data, null, 2));
       res.json(r.data);
     } catch (e: any) {
       console.error("[API] analyze error:", {
@@ -293,28 +294,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { results, scale } = req.body;
       const drawingId = req.params.drawingId;
       
-      if (!results || !results.models) {
+      if (!results || (!results.models && !results.predictions)) {
         return res.status(400).json({ message: "Invalid analysis results" });
       }
 
       const createdTakeoffs: any[] = [];
       
-      // Process each model's results
-      for (const [modelType, detections] of Object.entries(results.models)) {
+      // Handle both old format (results.models) and new format (results.predictions)
+      const predictions = results.predictions || results.models || {};
+      
+      // Process each prediction category
+      for (const [categoryType, detections] of Object.entries(predictions)) {
         const detectionsArray = detections as any[];
         for (const detection of detectionsArray) {
-          const takeoffData = {
+          const takeoffData: any = {
             drawingId,
-            elementType: modelType,
+            elementType: categoryType,
             elementName: detection.class || 'Unknown',
             itemType: detection.class || 'Unknown',
             quantity: 1,
             originalQuantity: 1,
-            coordinates: detection.bbox || detection.points || null,
+            coordinates: detection.bbox || detection.points || detection.mask || null,
             detectedByAi: true,
-            unit: modelType === 'floors' ? 'sq ft' : 'count',
             verified: false
           };
+
+          // Set unit and measurements based on category type
+          if (categoryType === 'rooms' || categoryType === 'flooring') {
+            takeoffData.unit = 'sq ft';
+            takeoffData.area = detection.display?.area_sqft || 0;
+            takeoffData.originalArea = detection.display?.area_sqft || 0;
+            takeoffData.length = detection.display?.perimeter_ft || 0; // Store perimeter in length field
+            takeoffData.originalLength = detection.display?.perimeter_ft || 0;
+            // Normalize the element type to 'rooms' for consistency
+            takeoffData.elementType = 'rooms';
+          } else if (categoryType === 'walls') {
+            takeoffData.unit = 'ft';
+            takeoffData.length = detection.display?.inner_perimeter || detection.display?.outer_perimeter || 0;
+            takeoffData.originalLength = takeoffData.length;
+          } else if (categoryType === 'openings') {
+            takeoffData.unit = 'count';
+            takeoffData.width = detection.display?.width || 0;
+            takeoffData.height = detection.display?.height || 0;
+          } else {
+            takeoffData.unit = 'count';
+          }
           
           const takeoff = await storage.createTakeoff(takeoffData);
           createdTakeoffs.push(takeoff);

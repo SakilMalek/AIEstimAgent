@@ -24,6 +24,7 @@ interface TakeoffSummary {
   flooring: { hardwood: number; tile: number; carpet: number; total: number };
   electrical: { outlets: number; lights: number; switches: number };
   walls: { length: number };
+  rooms: { total: number; totalArea: number; totalPerimeter: number };
   costs: { materials: number; labor: number; total: number };
 }
 
@@ -57,6 +58,7 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
     flooring: { hardwood: 0, tile: 0, carpet: 0, total: 0 },
     electrical: { outlets: 0, lights: 0, switches: 0 },
     walls: { length: 0 },
+    rooms: { total: 0, totalArea: 0, totalPerimeter: 0 },
     costs: { materials: 0, labor: 0, total: 0 },
   };
 
@@ -108,6 +110,11 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
           break;
         case "walls":
           summary.walls.length += takeoff.length || 0;
+          break;
+        case "rooms":
+          summary.rooms.total += takeoff.quantity || 0;
+          summary.rooms.totalArea += takeoff.area || 0;
+          summary.rooms.totalPerimeter += takeoff.length || 0; // Perimeter is stored in length field
           break;
       }
     });
@@ -189,6 +196,34 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
                   <p className="text-xs text-purple-600 mt-1">Interior + Exterior</p>
                 </CardContent>
               </Card>
+              
+              {summary.rooms.total > 0 && (
+                <>
+                  <Card className="bg-indigo-50 border-indigo-200">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-indigo-900">Total Room Area</h3>
+                        <span className="text-lg font-bold text-indigo-700">
+                          {summary.rooms.totalArea.toLocaleString()} sq ft
+                        </span>
+                      </div>
+                      <p className="text-xs text-indigo-600 mt-1">{summary.rooms.total} Room{summary.rooms.total !== 1 ? 's' : ''} Detected</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-cyan-50 border-cyan-200">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-cyan-900">Room Perimeter</h3>
+                        <span className="text-lg font-bold text-cyan-700">
+                          {summary.rooms.totalPerimeter.toLocaleString()} ft
+                        </span>
+                      </div>
+                      <p className="text-xs text-cyan-600 mt-1">Combined Perimeter</p>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
 
             {/* Detailed Breakdown */}
@@ -335,6 +370,36 @@ export default function TakeoffPanel({ drawing }: TakeoffPanelProps) {
                         <span className="font-medium">{summary.electrical.switches}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Rooms Section */}
+              {summary.rooms.total > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-slate-700 flex items-center">
+                      <Square className="w-4 h-4 text-indigo-600 mr-2" />
+                      Rooms
+                    </h4>
+                    <Button variant="ghost" size="sm" className="text-xs">
+                      <Edit className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-600">Total Rooms</span>
+                      <span className="font-medium">{summary.rooms.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-600">Total Area</span>
+                      <span className="font-medium">{summary.rooms.totalArea.toLocaleString()} sq ft</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-600">Total Perimeter</span>
+                      <span className="font-medium">{summary.rooms.totalPerimeter.toLocaleString()} ft</span>
+                    </div>
                   </div>
                 </div>
               )}
