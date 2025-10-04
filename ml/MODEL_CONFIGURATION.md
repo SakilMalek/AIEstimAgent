@@ -13,17 +13,17 @@ The ML API now correctly uses three separate Roboflow models to detect different
   - `ROOM_WORKSPACE`
   - `ROOM_PROJECT`
   - `ROOM_VERSION`
-- **Model ID Format**: `{ROOM_WORKSPACE}/{ROOM_PROJECT}/{ROOM_VERSION}`
+- **Model ID Format**: `{ROOM_PROJECT}/{ROOM_VERSION}`
 
 ### 2. Wall Detection Model
-- **Project**: `mytoolllaw-6vckj`
+- **Project**: `wall-detection-qpxun-rwqqb`
 - **Detects**: Only wall objects
 - **Environment Variables**:
   - `WALL_API_KEY`
   - `WALL_WORKSPACE`
   - `WALL_PROJECT`
   - `WALL_VERSION`
-- **Model ID Format**: `{WALL_WORKSPACE}/{WALL_PROJECT}/{WALL_VERSION}`
+- **Model ID Format**: `{WALL_PROJECT}/{WALL_VERSION}`
 
 ### 3. Door & Window Detection Model
 - **Project**: `mytool-i6igr`
@@ -33,7 +33,7 @@ The ML API now correctly uses three separate Roboflow models to detect different
   - `DOORWINDOW_WORKSPACE`
   - `DOORWINDOW_PROJECT`
   - `DOORWINDOW_VERSION`
-- **Model ID Format**: `{DOORWINDOW_WORKSPACE}/{DOORWINDOW_PROJECT}/{DOORWINDOW_VERSION}`
+- **Model ID Format**: `{DOORWINDOW_PROJECT}/{DOORWINDOW_VERSION}`
 - **Note**: This model detects multiple classes, but the API filters results to only include "door" and "window" classes
 
 ## API Endpoints
@@ -42,9 +42,9 @@ The ML API now correctly uses three separate Roboflow models to detect different
 Returns the current model configuration and status:
 ```json
 {
-  "room_model_id": "shakil-malek/room-detection-r0fta/1",
-  "wall_model_id": "shakil-malek/mytoolllaw-6vckj/1",
-  "doorwindow_model_id": "shakil-malek/mytool-i6igr/1",
+  "room_model_id": "room-detection-r0fta/1",
+  "wall_model_id": "wall-detection-qpxun-rwqqb/1",
+  "doorwindow_model_id": "mytool-i6igr/1",
   "has_room_api_key": true,
   "has_wall_api_key": true,
   "has_doorwindow_api_key": true,
