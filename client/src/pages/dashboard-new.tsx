@@ -4,7 +4,7 @@ import Layout from "@/components/layout";
 import DrawingViewer from "@/components/drawing-viewer";
 import InteractiveFloorPlan from "@/components/interactive-floor-plan";
 import VerticalTakeoffSelector from "@/components/vertical-takeoff-selector";
-import RealtimeAnalysisPanel from "@/components/realtime-analysis-panel";
+import OrganizedTakeoffPanel from "@/components/organized-takeoff-panel";
 import { ReportGeneratorComponent } from "@/components/report-generator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import CalibrationTool from "@/components/calibration-tool";
@@ -53,7 +53,7 @@ export default function Dashboard() {
   // MODIFICATION: The Zustand hook is now called at the top level, which is correct.
   const setDetections = useDetectionsStore(s => s.setDetections);
   
-  // NOTE: Real-time dimension updates are now handled in RealtimeAnalysisPanel
+  // NOTE: Real-time dimension updates are now handled in OrganizedTakeoffPanel
   // by reading directly from the store, avoiding re-renders that break editing
   
   const getPixelsPerFoot = (scale: string): number => {
@@ -253,15 +253,14 @@ export default function Dashboard() {
                 </SheetTrigger>
                 <SheetContent side="right" className="p-0 w-full sm:w-96">
                   <SheetHeader className="sr-only">
-                    <SheetTitle>AI Analysis Panel</SheetTitle>
-                    <SheetDescription>View the results of the real-time AI takeoff processing.</SheetDescription>
+                    <SheetTitle>Organized Takeoff Panel</SheetTitle>
+                    <SheetDescription>View organized takeoffs by location, type, or trade.</SheetDescription>
                   </SheetHeader>
-                  <RealtimeAnalysisPanel
+                  <OrganizedTakeoffPanel
                     drawing={currentDrawing}
                     selectedTypes={selectedTakeoffTypes}
                     isAnalyzing={isAnalyzing}
                     onStartAnalysis={handleRunAnalysis}
-                    onElementHover={setHighlightedElement}
                     analysisResults={analysisResults}
                   />
                 </SheetContent>
@@ -469,12 +468,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <RealtimeAnalysisPanel
+          <OrganizedTakeoffPanel
             drawing={currentDrawing}
             selectedTypes={selectedTakeoffTypes}
             isAnalyzing={isAnalyzing}
             onStartAnalysis={handleRunAnalysis}
-            onElementHover={setHighlightedElement}
             analysisResults={analysisResults}
           />
         </div>

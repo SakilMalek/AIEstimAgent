@@ -65,7 +65,8 @@ app = FastAPI(title="AIEstimAgent — ML API", version="1.0.0")
 allowed_origins = [
     "https://estimagent.vercel.app",
     "http://localhost:5173",
-    "http://localhost:5001"
+    "http://localhost:5001",
+    "http://localhost:8000"
 ]
 
 # Use environment variable if set, otherwise use default allowed origins
@@ -79,8 +80,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # ------------------------------------------------------------------------------
@@ -318,6 +321,10 @@ def root() -> Dict[str, Any]:
         "endpoints": ["/healthz", "/analyze"],
     }
 
+@app.options("/", response_class=PlainTextResponse)
+def options_root():
+    return PlainTextResponse("ok", status_code=200)
+
 @app.head("/", response_class=PlainTextResponse)
 def head_root():
     return PlainTextResponse("ok", status_code=200)
@@ -452,7 +459,12 @@ async def analyze(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Convenience: allow Render’s periodic HEAD health probe on /analyze (return 200 quickly)
+# Convenience: allow Render's periodic HEAD health probe on /analyze (return 200 quickly)
 @app.head("/analyze", response_class=PlainTextResponse)
 def head_analyze():
+    return PlainTextResponse("ok", status_code=200)
+
+@app.options("/analyze", response_class=PlainTextResponse)
+def options_analyze():
+    """Handle CORS preflight requests for /analyze endpoint."""
     return PlainTextResponse("ok", status_code=200)

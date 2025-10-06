@@ -50,27 +50,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const allowedOrigins = [
       'https://estimagent.vercel.app',
       'http://localhost:5173',
-      'http://localhost:5001'
+      'http://localhost:5001',
+      'http://localhost:8000'
     ];
     
     console.log('[CORS] Request from origin:', origin);
     
-    // Always set CORS headers
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    // Always set CORS headers first
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+    res.header('Access-Control-Max-Age', '3600');
     
     if (origin && allowedOrigins.includes(origin)) {
       res.header('Access-Control-Allow-Origin', origin);
       res.header('Access-Control-Allow-Credentials', 'true');
       console.log('[CORS] Allowed origin:', origin);
-    } else {
+    } else if (origin) {
       // For non-matching origins, still allow but without credentials
-      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Origin', origin);
       console.log('[CORS] Non-matching origin, allowing anyway:', origin);
+    } else {
+      // No origin header (e.g., same-origin requests)
+      res.header('Access-Control-Allow-Origin', '*');
     }
     
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.status(200).end();
     }
     next();
   });
