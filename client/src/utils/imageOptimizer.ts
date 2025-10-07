@@ -23,10 +23,24 @@ export async function compressImage(
     maxSizeMB = 5,
   } = options;
 
-  // If file is already small enough, return as-is
-  if (file.size <= maxSizeMB * 1024 * 1024) {
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    console.warn('[ImageOptimizer] Not an image file, returning as-is:', file.type);
     return file;
   }
+
+  // If file is already small enough, return as-is
+  if (file.size <= maxSizeMB * 1024 * 1024) {
+    console.log('[ImageOptimizer] File already small enough, skipping compression');
+    return file;
+  }
+
+  console.log('[ImageOptimizer] Starting compression:', {
+    originalSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+    maxWidth,
+    maxHeight,
+    quality
+  });
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -61,11 +75,20 @@ export async function compressImage(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Convert to blob
+        // Convert to blob with error handling
         canvas.toBlob(
           (blob) => {
             if (!blob) {
-              reject(new Error('Failed to compress image'));
+              console.error('[ImageOptimizer] Failed to create blob');
+              // Fallback to original file if compression fails
+              resolve(file);
+              return;
+            }
+            
+            // Validate blob size
+            if (blob.size === 0) {
+              console.error('[ImageOptimizer] Blob is empty, using original file');
+              resolve(file);
               return;
             }
             
@@ -75,6 +98,12 @@ export async function compressImage(
               lastModified: Date.now(),
             });
             
+            console.log('[ImageOptimizer] Compression successful:', {
+              originalSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+              compressedSize: `${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`,
+              reduction: `${Math.round((1 - compressedFile.size / file.size) * 100)}%`
+            });
+            
             resolve(compressedFile);
           },
           'image/jpeg',
@@ -82,11 +111,21 @@ export async function compressImage(
         );
       };
       
-      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onerror = (error) => {
+        console.error('[ImageOptimizer] Failed to load image:', error);
+        // Fallback to original file if image loading fails
+        resolve(file);
+      };
+      
       img.src = e.target?.result as string;
     };
     
-    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onerror = (error) => {
+      console.error('[ImageOptimizer] Failed to read file:', error);
+      // Fallback to original file if reading fails
+      resolve(file);
+    };
+    
     reader.readAsDataURL(file);
   });
 }

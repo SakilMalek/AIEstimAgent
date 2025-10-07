@@ -104,8 +104,34 @@ def _get_client(api_key: Optional[str] = None) -> InferenceHTTPClient:
 
 
 def _image_size_from_bytes(data: bytes) -> tuple[int, int]:
-    with Image.open(io.BytesIO(data)) as im:
-        return im.width, im.height
+    """Get image dimensions from bytes with robust error handling."""
+    try:
+        # Create BytesIO object and ensure it's at the beginning
+        img_buffer = io.BytesIO(data)
+        img_buffer.seek(0)
+        
+        # Try to open and verify the image
+        with Image.open(img_buffer) as im:
+            # Verify the image by loading it
+            im.verify()
+            
+        # Reopen for actual size reading (verify() closes the image)
+        img_buffer.seek(0)
+        with Image.open(img_buffer) as im:
+            width, height = im.size
+            if width <= 0 or height <= 0:
+                raise ValueError(f"Invalid image dimensions: {width}x{height}")
+            return width, height
+            
+    except Exception as e:
+        # Log the error for debugging
+        print(f"[ERROR] Failed to read image: {str(e)}")
+        print(f"[ERROR] Data length: {len(data)} bytes")
+        print(f"[ERROR] First 20 bytes: {data[:20]}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot identify image file. Please ensure the file is a valid image (PNG, JPG, etc.). Error: {str(e)}"
+        )
 
 def _calculate_polygon_area(points: List[Dict[str, float]]) -> float:
     """Calculate area of a polygon using the shoelace formula."""
@@ -386,11 +412,39 @@ async def analyze(
         detect_walls = "walls" in types_to_analyze
         detect_doors_windows = any(t in types_to_analyze for t in ["doors", "windows", "columns", "openings"])
         
-        # Read and save image
+        # Read and validate image
         data = await file.read()
         if not data:
             raise HTTPException(status_code=400, detail="Empty upload.")
+        
+        # Validate minimum file size (at least 100 bytes for a valid image)
+        if len(data) < 100:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File too small ({len(data)} bytes). Please upload a valid image file."
+            )
+        
+        # Check file signature (magic bytes) for common image formats
+        file_signature = data[:8]
+        valid_signatures = [
+            b'\x89PNG\r\n\x1a\n',  # PNG
+            b'\xff\xd8\xff',        # JPEG
+            b'GIF87a',              # GIF
+            b'GIF89a',              # GIF
+            b'BM',                  # BMP
+        ]
+        
+        is_valid_image = any(
+            file_signature.startswith(sig) for sig in valid_signatures
+        )
+        
+        if not is_valid_image:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image format. Please upload a PNG, JPEG, GIF, or BMP file."
+            )
 
+        # Get image dimensions with error handling
         img_w, img_h = _image_size_from_bytes(data)
 
         ext = os.path.splitext(file.filename or "")[-1].lower() or ".jpg"
