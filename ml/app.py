@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from PIL import Image
 from dotenv import load_dotenv
 from inference_sdk import InferenceHTTPClient
+import numpy as np
 
 # ------------------------------------------------------------------------------
 # Env & constants
@@ -54,6 +55,22 @@ if DOORWINDOW_PROJECT and DOORWINDOW_VERSION:
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/opt/render/project/src/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Custom YOLO model for ensemble learning (optional)
+CUSTOM_WINDOW_MODEL_PATH = os.getenv("CUSTOM_WINDOW_MODEL_PATH", "")
+CUSTOM_WINDOW_MODEL = None
+
+# Try to load custom YOLO model if path is provided
+if CUSTOM_WINDOW_MODEL_PATH and os.path.exists(CUSTOM_WINDOW_MODEL_PATH):
+    try:
+        from ultralytics import YOLO
+        CUSTOM_WINDOW_MODEL = YOLO(CUSTOM_WINDOW_MODEL_PATH)
+        print(f"[ML] SUCCESS: Loaded custom window model from: {CUSTOM_WINDOW_MODEL_PATH}")
+    except Exception as e:
+        print(f"[ML] WARNING: Failed to load custom window model: {e}")
+        CUSTOM_WINDOW_MODEL = None
+else:
+    print("[ML] INFO: Custom window model not configured (set CUSTOM_WINDOW_MODEL_PATH in .env)")
 
 # ------------------------------------------------------------------------------
 # App
@@ -345,6 +362,206 @@ def _infer_image(
     # You can pass extra params like `confidence`, `overlap`, `visualize`, etc. via kwargs.
     return client.infer(image_path, model_id=model_id, **kwargs)
 
+def _calculate_iou(box1: Dict[str, float], box2: Dict[str, float]) -> float:
+    """
+    Calculate Intersection over Union (IoU) between two bounding boxes.
+    Boxes are in format: {"x": center_x, "y": center_y, "w": width, "h": height}
+    """
+    # Convert center format to corner format
+    box1_x1 = box1["x"] - box1["w"] / 2
+    box1_y1 = box1["y"] - box1["h"] / 2
+    box1_x2 = box1["x"] + box1["w"] / 2
+    box1_y2 = box1["y"] + box1["h"] / 2
+    
+    box2_x1 = box2["x"] - box2["w"] / 2
+    box2_y1 = box2["y"] - box2["h"] / 2
+    box2_x2 = box2["x"] + box2["w"] / 2
+    box2_y2 = box2["y"] + box2["h"] / 2
+    
+    # Calculate intersection
+    x1 = max(box1_x1, box2_x1)
+    y1 = max(box1_y1, box2_y1)
+    x2 = min(box1_x2, box2_x2)
+    y2 = min(box1_y2, box2_y2)
+    
+    intersection = max(0, x2 - x1) * max(0, y2 - y1)
+    
+    # Calculate union
+    box1_area = box1["w"] * box1["h"]
+    box2_area = box2["w"] * box2["h"]
+    union = box1_area + box2_area - intersection
+    
+    return intersection / union if union > 0 else 0.0
+
+def _ensemble_door_window_predictions(
+    roboflow_preds: List[Dict[str, Any]],
+    custom_preds: List[Dict[str, Any]],
+    iou_threshold: float = 0.4
+) -> List[Dict[str, Any]]:
+    """
+    Combine predictions from Roboflow and custom YOLO model using ensemble learning.
+    
+    Strategy:
+    1. For overlapping detections (IoU > threshold), keep the one with higher confidence
+    2. Add non-overlapping detections from both models
+    3. Apply NMS to remove final duplicates
+    
+    Args:
+        roboflow_preds: Predictions from Roboflow model
+        custom_preds: Predictions from custom YOLO model
+        iou_threshold: IoU threshold for considering detections as overlapping
+    
+    Returns:
+        Combined list of predictions
+    """
+    print(f"[ML] Ensemble: Roboflow={len(roboflow_preds)}, Custom={len(custom_preds)}")
+    
+    if not custom_preds:
+        print("[ML] Ensemble: No custom predictions, returning Roboflow only")
+        return roboflow_preds
+    
+    if not roboflow_preds:
+        print("[ML] Ensemble: No Roboflow predictions, returning custom only")
+        return custom_preds
+    
+    combined = []
+    used_roboflow = set()
+    used_custom = set()
+    
+    # Find overlapping detections and keep the one with higher confidence
+    for i, custom_pred in enumerate(custom_preds):
+        if "bbox" not in custom_pred:
+            continue
+            
+        best_match_idx = None
+        max_iou = iou_threshold
+        
+        for j, robo_pred in enumerate(roboflow_preds):
+            if j in used_roboflow or "bbox" not in robo_pred:
+                continue
+            
+            iou = _calculate_iou(custom_pred["bbox"], robo_pred["bbox"])
+            if iou > max_iou:
+                max_iou = iou
+                best_match_idx = j
+        
+        if best_match_idx is not None:
+            # Overlapping detection found - use higher confidence
+            robo_pred = roboflow_preds[best_match_idx]
+            if custom_pred["confidence"] > robo_pred["confidence"]:
+                combined.append(custom_pred)
+                print(f"[ML] Ensemble: Using custom (conf={custom_pred['confidence']:.2f}) over Roboflow (conf={robo_pred['confidence']:.2f})")
+            else:
+                combined.append(robo_pred)
+                print(f"[ML] Ensemble: Using Roboflow (conf={robo_pred['confidence']:.2f}) over custom (conf={custom_pred['confidence']:.2f})")
+            used_roboflow.add(best_match_idx)
+            used_custom.add(i)
+        else:
+            # No overlap - add custom prediction
+            combined.append(custom_pred)
+            used_custom.add(i)
+            print(f"[ML] Ensemble: Added unique custom detection (conf={custom_pred['confidence']:.2f})")
+    
+    # Add remaining Roboflow predictions that weren't matched
+    for j, robo_pred in enumerate(roboflow_preds):
+        if j not in used_roboflow:
+            combined.append(robo_pred)
+            print(f"[ML] Ensemble: Added unique Roboflow detection (conf={robo_pred['confidence']:.2f})")
+    
+    print(f"[ML] Ensemble: Combined total = {len(combined)} detections")
+    return combined
+
+def _run_custom_yolo_model(
+    image_path: str,
+    img_w: int,
+    img_h: int,
+    confidence: float = 0.3,
+    scale: Optional[float] = None
+) -> List[Dict[str, Any]]:
+    """
+    Run custom YOLO model on image and convert to standard format.
+    
+    Args:
+        image_path: Path to image file
+        img_w: Image width
+        img_h: Image height
+        confidence: Confidence threshold
+        scale: Scale factor for real-world units
+    
+    Returns:
+        List of predictions in standard format
+    """
+    if not CUSTOM_WINDOW_MODEL:
+        return []
+    
+    try:
+        # Run inference
+        results = CUSTOM_WINDOW_MODEL.predict(
+            image_path,
+            conf=confidence,
+            iou=0.5,
+            verbose=False
+        )
+        
+        if not results or len(results) == 0:
+            return []
+        
+        result = results[0]
+        predictions = []
+        
+        # Convert YOLO format to standard format
+        for box in result.boxes:
+            # Get box coordinates (xyxy format)
+            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+            
+            # Convert to center format
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+            width = x2 - x1
+            height = y2 - y1
+            
+            # Get class name (assume 0=window for custom model)
+            class_id = int(box.cls[0])
+            class_name = "window"  # Default to window
+            
+            # Try to get class name from model
+            if hasattr(result, 'names') and class_id in result.names:
+                class_name = result.names[class_id].lower()
+            
+            pred = {
+                "id": str(uuid.uuid4()),
+                "class": class_name,
+                "confidence": float(box.conf[0]),
+                "category": class_name,
+                "bbox": {
+                    "x": float(center_x),
+                    "y": float(center_y),
+                    "w": float(width),
+                    "h": float(height)
+                },
+                "bbox_norm": {
+                    "x": float(center_x / img_w) if img_w else 0.0,
+                    "y": float(center_y / img_h) if img_h else 0.0,
+                    "w": float(width / img_w) if img_w else 0.0,
+                    "h": float(height / img_h) if img_h else 0.0,
+                },
+                "metrics": {},
+                "mask": [],
+                "display": {
+                    "width": _convert_to_real_units(width, scale, "ft"),
+                    "height": _convert_to_real_units(height, scale, "ft"),
+                },
+                "source": "custom_yolo"  # Mark as custom model prediction
+            }
+            predictions.append(pred)
+        
+        print(f"[ML] Custom YOLO model detected {len(predictions)} windows")
+        return predictions
+        
+    except Exception as e:
+        print(f"[ML] Error running custom YOLO model: {e}")
+        return []
+
 # ------------------------------------------------------------------------------
 # Routes
 # ------------------------------------------------------------------------------
@@ -524,15 +741,41 @@ async def analyze(
                 except Exception as e:
                     errors["walls"] = str(e)
 
-        # Run door/window detection (filter out rooms and walls from this model)
+        # Run door/window detection with ensemble learning
         if detect_doors_windows:
             if not DOORWINDOW_MODEL_ID:
                 errors["openings"] = "doors/windows model not configured"
             else:
                 try:
+                    # Run Roboflow model
                     raw = _infer_image(temp_path, model_id=DOORWINDOW_MODEL_ID, api_key=DOORWINDOW_API_KEY, **infer_kwargs)
                     # Filter to only include door and window classes
-                    door_window_preds = _normalize_predictions(raw, img_w, img_h, filter_classes=["door", "window", "Door", "Window"], scale=scale)
+                    roboflow_preds = _normalize_predictions(raw, img_w, img_h, filter_classes=["door", "window", "Door", "Window"], scale=scale)
+                    
+                    # If custom YOLO model is available, run ensemble learning
+                    if CUSTOM_WINDOW_MODEL:
+                        print("[ML] Running ensemble learning for door/window detection")
+                        # Run custom model
+                        custom_preds = _run_custom_yolo_model(
+                            temp_path,
+                            img_w,
+                            img_h,
+                            confidence=confidence or 0.3,
+                            scale=scale
+                        )
+                        
+                        # Combine predictions using ensemble strategy
+                        door_window_preds = _ensemble_door_window_predictions(
+                            roboflow_preds,
+                            custom_preds,
+                            iou_threshold=0.4
+                        )
+                        print(f"[ML] Ensemble result: {len(door_window_preds)} total detections")
+                    else:
+                        # No custom model - use Roboflow only
+                        door_window_preds = roboflow_preds
+                        print(f"[ML] Using Roboflow only: {len(door_window_preds)} detections")
+                    
                     results["predictions"]["openings"] = door_window_preds
                 except Exception as e:
                     errors["openings"] = str(e)
