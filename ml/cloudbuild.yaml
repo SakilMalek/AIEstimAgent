@@ -1,8 +1,7 @@
 steps:
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/estimagent/ml-service', '-f', 'Dockerfile', '.']
-    dir: 'ml'
+    args: ['build', '-t', 'gcr.io/estimagent/ml-service', '-f', 'ml/Dockerfile', '.']
   
   # Push the Docker image to GCR
   - name: 'gcr.io/cloud-builders/docker'
