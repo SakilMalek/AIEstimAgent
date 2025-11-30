@@ -4,7 +4,7 @@ FROM node:18-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for PDF processing
+# Install system dependencies for PDF processing (force rebuild)
 RUN apt-get update && apt-get install -y \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
