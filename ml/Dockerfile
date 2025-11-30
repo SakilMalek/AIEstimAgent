@@ -13,13 +13,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY ml/requirements.txt requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (including pdf_processor for PDF handling)
-COPY app.py pdf_processor.py ./
+COPY ml/app.py ml/pdf_processor.py ./
 
 # Create uploads directory
 RUN mkdir -p /app/uploads
