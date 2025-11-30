@@ -150,6 +150,18 @@ app.add_middleware(
 # Mount PDF uploads directory for serving images
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    print("[ML] 🚀 ML Service starting up...")
+    print(f"[ML] 📁 Upload directory: {UPLOAD_DIR}")
+    print(f"[ML] 📄 PDF upload directory: {PDF_UPLOAD_DIR}")
+    print(f"[ML] 🏠 Room model: {ROOM_MODEL_ID or 'Custom YOLO'}")
+    print(f"[ML] 🧱 Wall model: {WALL_MODEL_ID or 'Not configured'}")
+    print(f"[ML] 🚪 Door/Window model: {DOORWINDOW_MODEL_ID or 'Not configured'}")
+    print(f"[ML] 📋 Page classifier: {PAGE_PROJECT or 'Not configured'}")
+    print("[ML] ✅ ML Service ready!")
+
 # ------------------------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------------------------

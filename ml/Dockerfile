@@ -32,5 +32,9 @@ ENV PYTHONUNBUFFERED=1
 # Expose port (Cloud Run uses PORT env var)
 EXPOSE 8080
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8080/healthz', timeout=2).raise_for_status()"
+
 # Run the application
 CMD uvicorn app:app --host 0.0.0.0 --port ${PORT}
