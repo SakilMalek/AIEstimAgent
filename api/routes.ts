@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'http://localhost:8000'
     ];
     
-    console.log('[CORS] Request from origin:', origin);
+    console.log('[CORS] Request from origin:', origin, 'Method:', req.method, 'Path:', req.path);
     
     // Always set CORS headers first
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
@@ -84,6 +84,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Serve uploaded files statically
   app.use("/uploads", express.static(uploadDir));
+  
+  // --- ROOT ENDPOINT (must be before other routes) ---
+  app.get("/", (_req, res) => {
+    console.log('[API] Root endpoint hit!');
+    res.json({ 
+      service: "EstimAgent API",
+      version: "1.0.0",
+      status: "running",
+      endpoints: [
+        "/health",
+        "/api/health",
+        "/api/test",
+        "/api/projects",
+        "/api/upload",
+        "/api/upload-pdf",
+        "/api/analyze"
+      ]
+    });
+  });
+
+  // --- HEALTH CHECK ENDPOINTS ---
+  app.get("/health", (_req, res) => {
+    console.log('[API] Health endpoint hit!');
+    res.json({ status: "ok", service: "estimagent-api" });
+  });
+
+  app.get("/api/health", (_req, res) => {
+    console.log('[API] API health endpoint hit!');
+    res.json({ status: "ok", service: "estimagent-api" });
+  });
   
   // --- AI ANALYSIS PROXY ENDPOINT ---
   app.post("/api/analyze", memoryUpload.single("file"), async (req: MulterRequest, res) => {
@@ -145,33 +175,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       mimetype: req.file.mimetype,
       size: req.file.size,
     });
-  });
-
-  // --- ROOT ENDPOINT ---
-  app.get("/", (_req, res) => {
-    res.json({ 
-      service: "EstimAgent API",
-      version: "1.0.0",
-      status: "running",
-      endpoints: [
-        "/health",
-        "/api/health",
-        "/api/test",
-        "/api/projects",
-        "/api/upload",
-        "/api/upload-pdf",
-        "/api/analyze"
-      ]
-    });
-  });
-
-  // --- HEALTH CHECK ENDPOINTS ---
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok", service: "estimagent-api" });
-  });
-
-  app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", service: "estimagent-api" });
   });
 
   // --- TEST ENDPOINT ---
