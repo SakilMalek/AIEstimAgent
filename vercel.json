@@ -1,9 +1,6 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "typescript": {
-    "ignoreBuildErrors": true
-  },
   "rewrites": [
     {
       "source": "/(.*)",
