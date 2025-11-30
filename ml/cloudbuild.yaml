@@ -1,7 +1,7 @@
 steps:
   # Build the Docker image with cache busting
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--no-cache', '-t', 'gcr.io/estimagent/ml-service', '-t', 'gcr.io/estimagent/ml-service:$BUILD_ID', '-f', 'ml/Dockerfile', 'ml/']
+    args: ['build', '--no-cache', '-t', 'gcr.io/estimagent/ml-service', '-t', 'gcr.io/estimagent/ml-service:$BUILD_ID', '-f', 'ml/Dockerfile', '.']
   
   # Push both tags
   - name: 'gcr.io/cloud-builders/docker'
