@@ -197,12 +197,12 @@ export default function ProjectDetail() {
   };
 
   const handleSaveTakeoff = (takeoffId: string) => {
-    const totalCost = editValues.quantity * editValues.cost_per_unit;
+    const totalCost = editValues.quantity * editValues.costPerUnit;
     updateTakeoffMutation.mutate({
       id: takeoffId,
       data: {
         quantity: editValues.quantity,
-        costPerUnit: editValues.cost_per_unit,
+        costPerUnit: editValues.costPerUnit,
         area: editValues.area,
         length: editValues.length,
         totalCost,
@@ -340,7 +340,6 @@ export default function ProjectDetail() {
       "Total Cost", 
       "AI Detected",
       "Manually Edited",
-      "Original Quantity",
       "Verified", 
       "Notes"
     ];
@@ -367,7 +366,6 @@ export default function ProjectDetail() {
         takeoff.total_cost?.toString() || "0",
         takeoff.is_detected_by_ai ? "Yes" : "No",
         takeoff.is_manually_edited ? "Yes" : "No",
-        takeoff.original_quantity?.toString() || "",
         takeoff.is_verified ? "Yes" : "No",
         takeoff.notes || ""
       ];
@@ -742,8 +740,7 @@ export default function ProjectDetail() {
                             <div>
                               <Label htmlFor={`quantity-${takeoff.id}`}>
                                 Quantity
-                                {takeoff.original_quantity && takeoff.original_quantity !== editValues.quantity && (
-                                  <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.original_quantity})</span>
+                                )</span>
                                 )}
                               </Label>
                               <Input
@@ -754,8 +751,7 @@ export default function ProjectDetail() {
                                   ...editValues,
                                   quantity: parseInt(e.target.value) || 0
                                 })}
-                                className={takeoff.original_quantity && takeoff.original_quantity !== editValues.quantity ? 
-                                  "border-yellow-300 bg-yellow-50" : ""}
+                                className=
                               />
                             </div>
                             
@@ -763,8 +759,7 @@ export default function ProjectDetail() {
                               <div>
                                 <Label htmlFor={`area-${takeoff.id}`}>
                                   Area (sq ft)
-                                  {takeoff.original_area && takeoff.original_area !== editValues.area && (
-                                    <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.original_area})</span>
+                                  )</span>
                                   )}
                                 </Label>
                                 <Input
@@ -776,8 +771,7 @@ export default function ProjectDetail() {
                                     ...editValues,
                                     area: parseFloat(e.target.value) || null
                                   })}
-                                  className={takeoff.original_area && takeoff.original_area !== editValues.area ? 
-                                    "border-yellow-300 bg-yellow-50" : ""}
+                                  className=
                                 />
                               </div>
                             )}
@@ -786,8 +780,7 @@ export default function ProjectDetail() {
                               <div>
                                 <Label htmlFor={`length-${takeoff.id}`}>
                                   Length (ft)
-                                  {takeoff.original_length && takeoff.original_length !== editValues.length && (
-                                    <span className="text-xs text-slate-500 ml-1">(AI: {takeoff.original_length})</span>
+                                  )</span>
                                   )}
                                 </Label>
                                 <Input
@@ -799,8 +792,7 @@ export default function ProjectDetail() {
                                     ...editValues,
                                     length: parseFloat(e.target.value) || null
                                   })}
-                                  className={takeoff.original_length && takeoff.original_length !== editValues.length ? 
-                                    "border-yellow-300 bg-yellow-50" : ""}
+                                  className=
                                 />
                               </div>
                             )}
@@ -808,21 +800,17 @@ export default function ProjectDetail() {
                             <div>
                               <Label htmlFor={`cost-${takeoff.id}`}>
                                 Cost Per Unit ($)
-                                {takeoff.original_cost_per_unit && takeoff.original_cost_per_unit !== editValues.cost_per_unit && (
-                                  <span className="text-xs text-slate-500 ml-1">(Original: ${takeoff.original_cost_per_unit})</span>
-                                )}
                               </Label>
                               <Input
                                 id={`cost-${takeoff.id}`}
                                 type="number"
                                 step="0.01"
-                                value={editValues.cost_per_unit}
+                                value={editValues.costPerUnit}
                                 onChange={(e) => setEditValues({
                                   ...editValues,
                                   costPerUnit: parseFloat(e.target.value) || 0
                                 })}
-                                className={takeoff.original_cost_per_unit && takeoff.original_cost_per_unit !== editValues.cost_per_unit ? 
-                                  "border-yellow-300 bg-yellow-50" : ""}
+                                className=""
                               />
                             </div>
                           </div>
@@ -836,7 +824,7 @@ export default function ProjectDetail() {
                             <div>
                               <Label className="text-xs text-slate-600">Calculated Total Cost</Label>
                               <p className="font-medium text-lg text-slate-900">
-                                ${(editValues.quantity * editValues.cost_per_unit).toLocaleString()}
+                                ${(editValues.quantity * editValues.costPerUnit).toLocaleString()}
                               </p>
                             </div>
                             <div className="flex items-end">
@@ -849,7 +837,7 @@ export default function ProjectDetail() {
                                   if (takeoff.original_length) setEditValues({...editValues, length: takeoff.original_length});
                                   if (takeoff.original_cost_per_unit) setEditValues({...editValues, costPerUnit: takeoff.original_cost_per_unit});
                                 }}
-                                disabled={!takeoff.original_quantity && !takeoff.original_cost_per_unit}
+                                disabled={!!takeoff.original_cost_per_unit}
                               >
                                 <RotateCcw className="w-4 h-4 mr-1" />
                                 Reset to AI
@@ -915,8 +903,7 @@ export default function ProjectDetail() {
                               <div>
                                 <p className="text-slate-500">
                                   Quantity
-                                  {takeoff.original_quantity && takeoff.original_quantity !== takeoff.quantity && (
-                                    <span className="text-xs text-yellow-600 ml-1">(was {takeoff.original_quantity})</span>
+                                  )</span>
                                   )}
                                 </p>
                                 <p className="font-medium">{takeoff.quantity} {takeoff.unit}</p>
@@ -925,8 +912,7 @@ export default function ProjectDetail() {
                                 <div>
                                   <p className="text-slate-500">
                                     Area
-                                    {takeoff.original_area && takeoff.original_area !== takeoff.area && (
-                                      <span className="text-xs text-yellow-600 ml-1">(was {takeoff.original_area})</span>
+                                    )</span>
                                     )}
                                   </p>
                                   <p className="font-medium">{takeoff.area} sq ft</p>
@@ -935,8 +921,7 @@ export default function ProjectDetail() {
                               <div>
                                 <p className="text-slate-500">
                                   Cost/Unit
-                                  {takeoff.original_cost_per_unit && takeoff.original_cost_per_unit !== takeoff.cost_per_unit && (
-                                    <span className="text-xs text-yellow-600 ml-1">(was ${takeoff.original_cost_per_unit})</span>
+                                  )</span>
                                   )}
                                 </p>
                                 <p className="font-medium">${takeoff.cost_per_unit?.toLocaleString() || "0"}</p>
