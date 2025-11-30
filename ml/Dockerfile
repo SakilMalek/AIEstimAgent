@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY app.py .
+COPY app.py pdf_processor.py ./
 
 # Copy custom model directory (if exists)
 COPY models ./models
@@ -32,9 +32,9 @@ ENV PYTHONUNBUFFERED=1
 # Expose port (Cloud Run uses PORT env var)
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8080/healthz', timeout=2).raise_for_status()"
+# Health check (longer start-period for model loading)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8080/healthz', timeout=5).raise_for_status()" || exit 1
 
 # Run the application
 CMD uvicorn app:app --host 0.0.0.0 --port ${PORT}
