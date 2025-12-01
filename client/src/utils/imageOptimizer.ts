@@ -70,12 +70,12 @@ export async function compressImage(
           return;
         }
         
-        // Use better image smoothing for quality
+        // Use medium quality smoothing for speed (not high)
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingQuality = 'medium';
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Convert to blob with error handling
+        // Convert to blob with error handling - use lower quality for speed
         canvas.toBlob(
           (blob) => {
             if (!blob) {

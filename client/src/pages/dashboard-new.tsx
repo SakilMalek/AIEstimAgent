@@ -381,28 +381,48 @@ export default function Dashboard() {
     setDetections([]); // Clear previous detections on new upload
 
     try {
-      // Optimize image before upload
+      console.log('[Upload] Starting optimized upload flow...');
+      const uploadStart = performance.now();
+      
+      // Aggressive compression for faster upload (1280px max, 0.75 quality)
       const originalSize = formatFileSize(file.size);
+      console.log('[Upload] Compressing image from', originalSize);
+      
       const optimizedFile = await compressImage(file, {
-        maxWidth: 2048,
-        maxHeight: 2048,
-        quality: 0.85,
-        maxSizeMB: 5
+        maxWidth: 1280,    // Reduced from 2048 for faster upload
+        maxHeight: 1280,   // Reduced from 2048 for faster upload
+        quality: 0.75,     // Reduced from 0.85 for faster compression
+        maxSizeMB: 3       // Reduced from 5 for faster upload
       });
       const newSize = formatFileSize(optimizedFile.size);
-      console.log(`Image optimized: ${originalSize} → ${newSize}`);
+      const compressionTime = performance.now() - uploadStart;
+      console.log(`[Upload] Compressed: ${originalSize} → ${newSize} (${compressionTime.toFixed(0)}ms)`);
       
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', optimizedFile);
-      const uploadResult = await apiRequest(createApiUrl('/api/upload'), 'POST', uploadFormData, true);
+      // Parallel: Create project and upload file simultaneously
+      console.log('[Upload] Starting parallel upload and project creation...');
+      const uploadStart2 = performance.now();
+      
+      const [uploadResult, projectToUse] = await Promise.all([
+        // Upload file
+        (async () => {
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', optimizedFile);
+          return apiRequest(createApiUrl('/api/upload'), 'POST', uploadFormData, true);
+        })(),
+        // Create project in parallel
+        currentProject ? Promise.resolve(currentProject) : createNewProject(file.name)
+      ]);
 
       if (!uploadResult || !uploadResult.filename || !uploadResult.file_url) {
         throw new Error('Invalid upload response');
       }
 
-      let projectToUse = currentProject || await createNewProject(file.name);
+      const uploadTime = performance.now() - uploadStart2;
+      console.log(`[Upload] Upload + project creation completed in ${uploadTime.toFixed(0)}ms`);
+      
       setCurrentProject(projectToUse);
 
+      // Create drawing record
       const drawingData = {
         project_id: projectToUse.id,
         name: file.name,
@@ -413,9 +433,12 @@ export default function Dashboard() {
         scale: selectedScale,
         ai_processed: false
       };
-      console.log('Drawing data:', drawingData);
+      
+      console.log('[Upload] Creating drawing record...');
       const savedDrawing = await apiRequest(createApiUrl(`/api/projects/${projectToUse.id}/drawings`), "POST", drawingData);
-      console.log('Upload response:', savedDrawing);
+      
+      const totalTime = performance.now() - uploadStart;
+      console.log(`[Upload] ✅ Complete in ${totalTime.toFixed(0)}ms`);
 
       setCurrentDrawing(savedDrawing);
       toast({ title: "Upload Successful", description: "Select takeoff types and click 'Run AI Analysis'." });
