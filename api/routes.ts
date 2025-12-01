@@ -7,6 +7,7 @@ import fs from "fs";
 import axios from "axios";
 import FormData from "form-data";
 import { storage } from "./storage";
+import { generateSignedUploadUrl } from "./gcs";
 import {
   insertProjectSchema,
   insertDrawingSchema,
@@ -171,9 +172,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[API] Generating signed URL for:', filename);
-      
-      // Import GCS utilities
-      const { generateSignedUploadUrl } = await import("./gcs.js");
       
       const { signedUrl, publicUrl } = await generateSignedUploadUrl(
         filename,
